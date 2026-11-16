@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "HostEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": 1,
+          "default": 1,
+          "title": "Protocol Version",
+          "type": "integer"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "execution_id": {
+          "title": "Execution Id",
+          "type": "string"
+        },
+        "generation": {
+          "minimum": 1,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "type": {
+          "enum": [
+            "hello",
+            "progress",
+            "result"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "host_sequence": {
+          "minimum": 1,
+          "title": "Host Sequence",
+          "type": "integer"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Progress"
+        },
+        "result_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result Path"
+        },
+        "child_pid": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Child Pid"
+        }
+      },
+      "required": [
+        "task_id",
+        "attempt_id",
+        "execution_id",
+        "generation",
+        "type",
+        "host_sequence"
+      ],
+      "title": "HostEvent",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocol Version",
+      "type": "integer"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "attempt_id": {
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "execution_id": {
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "generation": {
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "type": {
+      "const": "result",
+      "default": "result",
+      "title": "Type",
+      "type": "string"
+    },
+    "host_sequence": {
+      "minimum": 2,
+      "title": "Host Sequence",
+      "type": "integer"
+    },
+    "outcome": {
+      "enum": [
+        "succeeded",
+        "retryable",
+        "permanent",
+        "cancelled",
+        "uncertain"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "safe": {
+      "title": "Safe",
+      "type": "boolean"
+    },
+    "fake": {
+      "const": true,
+      "default": true,
+      "title": "Fake",
+      "type": "boolean"
+    },
+    "receipt": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Receipt"
+    },
+    "history": {
+      "items": {
+        "$ref": "#/$defs/HostEvent"
+      },
+      "title": "History",
+      "type": "array"
+    }
+  },
+  "required": [
+    "task_id",
+    "attempt_id",
+    "execution_id",
+    "generation",
+    "host_sequence",
+    "outcome",
+    "safe",
+    "history"
+  ],
+  "title": "HostResult",
+  "type": "object"
+}

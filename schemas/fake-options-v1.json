@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "scenario": {
+      "default": "success",
+      "enum": [
+        "success",
+        "retryable",
+        "permanent",
+        "crash",
+        "cancel_safe",
+        "cancel_uncertain",
+        "invalid_result",
+        "late_result",
+        "child",
+        "hang",
+        "no_handshake",
+        "crash_before_go"
+      ],
+      "title": "Scenario",
+      "type": "string"
+    },
+    "duration_seconds": {
+      "default": 0.2,
+      "maximum": 300,
+      "minimum": 0,
+      "title": "Duration Seconds",
+      "type": "number"
+    },
+    "failures_before_success": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Failures Before Success",
+      "type": "integer"
+    }
+  },
+  "title": "FakeOptions",
+  "type": "object"
+}

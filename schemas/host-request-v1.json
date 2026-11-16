@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "FakeOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "scenario": {
+          "default": "success",
+          "enum": [
+            "success",
+            "retryable",
+            "permanent",
+            "crash",
+            "cancel_safe",
+            "cancel_uncertain",
+            "invalid_result",
+            "late_result",
+            "child",
+            "hang",
+            "no_handshake",
+            "crash_before_go"
+          ],
+          "title": "Scenario",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "default": 0.2,
+          "maximum": 300,
+          "minimum": 0,
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "failures_before_success": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Failures Before Success",
+          "type": "integer"
+        }
+      },
+      "title": "FakeOptions",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocol Version",
+      "type": "integer"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "attempt_id": {
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "execution_id": {
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "generation": {
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "type": {
+      "const": "request",
+      "default": "request",
+      "title": "Type",
+      "type": "string"
+    },
+    "attempt_number": {
+      "minimum": 1,
+      "title": "Attempt Number",
+      "type": "integer"
+    },
+    "options": {
+      "$ref": "#/$defs/FakeOptions"
+    },
+    "result_path": {
+      "title": "Result Path",
+      "type": "string"
+    },
+    "evidence_path": {
+      "title": "Evidence Path",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "attempt_id",
+    "execution_id",
+    "generation",
+    "attempt_number",
+    "options",
+    "result_path",
+    "evidence_path"
+  ],
+  "title": "HostRequest",
+  "type": "object"
+}

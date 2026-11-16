@@ -1,0 +1,45 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "protocol_version": {
+      "const": 1,
+      "default": 1,
+      "title": "Protocol Version",
+      "type": "integer"
+    },
+    "task_id": {
+      "title": "Task Id",
+      "type": "string"
+    },
+    "attempt_id": {
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "execution_id": {
+      "title": "Execution Id",
+      "type": "string"
+    },
+    "generation": {
+      "minimum": 1,
+      "title": "Generation",
+      "type": "integer"
+    },
+    "type": {
+      "enum": [
+        "go",
+        "cancel"
+      ],
+      "title": "Type",
+      "type": "string"
+    }
+  },
+  "required": [
+    "task_id",
+    "attempt_id",
+    "execution_id",
+    "generation",
+    "type"
+  ],
+  "title": "Command",
+  "type": "object"
+}

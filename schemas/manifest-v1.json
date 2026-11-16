@@ -1,0 +1,365 @@
+{
+  "$defs": {
+    "Asset": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path"
+      ],
+      "title": "Asset",
+      "type": "object"
+    },
+    "Assets": {
+      "additionalProperties": false,
+      "properties": {
+        "videos": {
+          "items": {
+            "$ref": "#/$defs/Video"
+          },
+          "title": "Videos",
+          "type": "array"
+        },
+        "covers": {
+          "items": {
+            "$ref": "#/$defs/Asset"
+          },
+          "title": "Covers",
+          "type": "array"
+        },
+        "subtitles": {
+          "items": {
+            "$ref": "#/$defs/Subtitle"
+          },
+          "title": "Subtitles",
+          "type": "array"
+        }
+      },
+      "title": "Assets",
+      "type": "object"
+    },
+    "FakeOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "scenario": {
+          "default": "success",
+          "enum": [
+            "success",
+            "retryable",
+            "permanent",
+            "crash",
+            "cancel_safe",
+            "cancel_uncertain",
+            "invalid_result",
+            "late_result",
+            "child",
+            "hang",
+            "no_handshake",
+            "crash_before_go"
+          ],
+          "title": "Scenario",
+          "type": "string"
+        },
+        "duration_seconds": {
+          "default": 0.2,
+          "maximum": 300,
+          "minimum": 0,
+          "title": "Duration Seconds",
+          "type": "number"
+        },
+        "failures_before_success": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Failures Before Success",
+          "type": "integer"
+        }
+      },
+      "title": "FakeOptions",
+      "type": "object"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "default": null,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "cover": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cover"
+        }
+      },
+      "title": "Metadata",
+      "type": "object"
+    },
+    "Subtitle": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "language": {
+          "minLength": 1,
+          "title": "Language",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "language"
+      ],
+      "title": "Subtitle",
+      "type": "object"
+    },
+    "Target": {
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "const": "fake",
+          "default": "fake",
+          "title": "Platform",
+          "type": "string"
+        },
+        "account": {
+          "default": "fake-default",
+          "title": "Account",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "options": {
+          "$ref": "#/$defs/FakeOptions"
+        }
+      },
+      "title": "Target",
+      "type": "object"
+    },
+    "Unit": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "mode": {
+          "enum": [
+            "multipart",
+            "independent"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "metadata_overrides": {
+          "$ref": "#/$defs/Metadata"
+        },
+        "videos": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Videos",
+          "type": "array"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/Target"
+          },
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "mode",
+        "videos"
+      ],
+      "title": "Unit",
+      "type": "object"
+    },
+    "Video": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "minLength": 1,
+          "title": "Id",
+          "type": "string"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "subtitles": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Subtitles",
+          "type": "array"
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata"
+        }
+      },
+      "required": [
+        "id",
+        "path"
+      ],
+      "title": "Video",
+      "type": "object"
+    },
+    "WorkMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "default": null,
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "tags": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tags"
+        },
+        "cover": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cover"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "ready": {
+          "default": false,
+          "title": "Ready",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "WorkMetadata",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1,
+      "title": "Version",
+      "type": "integer"
+    },
+    "work": {
+      "$ref": "#/$defs/WorkMetadata"
+    },
+    "assets": {
+      "$ref": "#/$defs/Assets"
+    },
+    "upload_units": {
+      "items": {
+        "$ref": "#/$defs/Unit"
+      },
+      "minItems": 1,
+      "title": "Upload Units",
+      "type": "array"
+    }
+  },
+  "required": [
+    "version",
+    "work",
+    "assets",
+    "upload_units"
+  ],
+  "title": "Manifest",
+  "type": "object"
+}

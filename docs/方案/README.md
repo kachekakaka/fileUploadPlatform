@@ -6,7 +6,7 @@
 
 当前活动方案：
 
-- [Bilibili Adapter 实施方案 v1.0](20261116-Bilibili-Adapter实施方案.md) — 待确认；网页扫码登录与网页投稿协议，自主实现，单 P / 多 P，账号并发 3。
+- [Bilibili 集成与自维护方案 v1.2](20261116-Bilibili集成与自维护方案-v1.2.md) — 待确认；biliup 源码独立 Import 到私有仓库，最终只保留 B 站上传能力，由 fileUploadPlatform 统一调度。
 
 Core MVP 审查发现的三个缺陷和取消/恢复/迟到结果验收缺口已修复，见[审查修复及验证](../../archive/方案/20261116-Core-MVP审查修复.md#实际结果)。原始实现记录见[Core MVP 归档](../../archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
 

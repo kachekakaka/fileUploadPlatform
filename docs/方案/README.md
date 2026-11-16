@@ -4,7 +4,7 @@
 
 ## 当前活动方案
 
-- [Core MVP 实施方案 v0.1](20261116-Core-MVP实施方案.md) — 待确认；范围为即时任务、本地文件引用、REST API、独立 Worker、Fake Adapter 和 CLI。
+- [Core MVP 实施方案 v0.1](20261116-Core-MVP实施方案.md) — 待确认；以 `upload.yaml` 作品包为入口，支持 multipart / independent 两种视频组织方式、三级元数据覆盖、即时及一次性定时任务、REST API、独立 Worker、Fake Adapter 和 CLI。
 
 ## 查找历史
 

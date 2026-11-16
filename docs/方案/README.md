@@ -4,7 +4,7 @@
 
 ## 当前活动方案
 
-当前无活动方案。
+- [Core MVP 实施方案 v0.1](20261116-Core-MVP实施方案.md) — 待确认；范围为即时任务、本地文件引用、REST API、独立 Worker、Fake Adapter 和 CLI。
 
 ## 查找历史
 

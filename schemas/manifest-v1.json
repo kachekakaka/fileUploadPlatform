@@ -49,6 +49,75 @@
       "title": "Assets",
       "type": "object"
     },
+    "BilibiliOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "category_id": {
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Category Id",
+          "type": "integer"
+        },
+        "copyright": {
+          "enum": [
+            1,
+            2
+          ],
+          "title": "Copyright",
+          "type": "integer"
+        },
+        "source": {
+          "default": "",
+          "title": "Source",
+          "type": "string"
+        },
+        "publish_mode": {
+          "enum": [
+            "public",
+            "self_only"
+          ],
+          "title": "Publish Mode",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category_id",
+        "copyright",
+        "publish_mode"
+      ],
+      "title": "BilibiliOptions",
+      "type": "object"
+    },
+    "BilibiliTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "const": "bilibili",
+          "title": "Platform",
+          "type": "string"
+        },
+        "account": {
+          "minLength": 1,
+          "title": "Account",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "options": {
+          "$ref": "#/$defs/BilibiliOptions"
+        }
+      },
+      "required": [
+        "platform",
+        "account",
+        "options"
+      ],
+      "title": "BilibiliTarget",
+      "type": "object"
+    },
     "FakeOptions": {
       "additionalProperties": false,
       "properties": {
@@ -86,6 +155,32 @@
         }
       },
       "title": "FakeOptions",
+      "type": "object"
+    },
+    "FakeTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "const": "fake",
+          "default": "fake",
+          "title": "Platform",
+          "type": "string"
+        },
+        "account": {
+          "default": "fake-default",
+          "title": "Account",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "options": {
+          "$ref": "#/$defs/FakeOptions"
+        }
+      },
+      "title": "FakeTarget",
       "type": "object"
     },
     "Metadata": {
@@ -167,32 +262,6 @@
       "title": "Subtitle",
       "type": "object"
     },
-    "Target": {
-      "additionalProperties": false,
-      "properties": {
-        "platform": {
-          "const": "fake",
-          "default": "fake",
-          "title": "Platform",
-          "type": "string"
-        },
-        "account": {
-          "default": "fake-default",
-          "title": "Account",
-          "type": "string"
-        },
-        "enabled": {
-          "default": true,
-          "title": "Enabled",
-          "type": "boolean"
-        },
-        "options": {
-          "$ref": "#/$defs/FakeOptions"
-        }
-      },
-      "title": "Target",
-      "type": "object"
-    },
     "Unit": {
       "additionalProperties": false,
       "properties": {
@@ -222,7 +291,21 @@
         },
         "targets": {
           "items": {
-            "$ref": "#/$defs/Target"
+            "discriminator": {
+              "mapping": {
+                "bilibili": "#/$defs/BilibiliTarget",
+                "fake": "#/$defs/FakeTarget"
+              },
+              "propertyName": "platform"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/FakeTarget"
+              },
+              {
+                "$ref": "#/$defs/BilibiliTarget"
+              }
+            ]
           },
           "title": "Targets",
           "type": "array"

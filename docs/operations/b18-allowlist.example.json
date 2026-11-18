@@ -1,0 +1,33 @@
+{
+  "run_id": "00000000-0000-4000-8000-000000000018",
+  "core_data_dir": "D:/b18-example/core",
+  "engine_build_id": "bue-0.2.0-dev1",
+  "mid": "42",
+  "single": {
+    "work_id": "00000000-0000-4000-8000-000000000101",
+    "directory": "D:/b18-example/works/single",
+    "unit_id": "main",
+    "title": "单 P 验收",
+    "description": "合成测试片",
+    "tags": ["测试"],
+    "cover": null,
+    "parts": [
+      {"video_id": "v1", "path": "first.mp4", "title": "单 P 验收"}
+    ],
+    "options": {"category_id": 171, "copyright": 1, "source": "", "publish_mode": "public"}
+  },
+  "multi": {
+    "work_id": "00000000-0000-4000-8000-000000000102",
+    "directory": "D:/b18-example/works/multi",
+    "unit_id": "main",
+    "title": "多 P 验收",
+    "description": "合成测试片",
+    "tags": ["测试"],
+    "cover": "cover.jpg",
+    "parts": [
+      {"video_id": "v1", "path": "first.mp4", "title": "第一段 A"},
+      {"video_id": "v2", "path": "second.mp4", "title": "第二段 B"}
+    ],
+    "options": {"category_id": 171, "copyright": 1, "source": "", "publish_mode": "public"}
+  }
+}

@@ -30,6 +30,18 @@ def read_result(attempt):
     if not path or not Path(path).exists():
         return None
     try:
+        if attempt["execution"].get("adapter") == "bilibili":
+            import json
+            from upload_platform.adapters.bilibili.protocol import verify_result
+
+            result_file = Path(path)
+            if str(result_file.resolve()).casefold() != str(result_file.absolute()).casefold():
+                raise Problem("invalid_result_path", "结果路径不得重定向", 409)
+            with result_file.open("rb") as source:
+                content = source.read(4 * 1024 * 1024 + 1)
+            if len(content) > 4 * 1024 * 1024:
+                raise Problem("invalid_result", "引擎结果超过大小限制", 409)
+            return verify_result(json.loads(content), attempt).model_dump()
         result = HostResult.model_validate_json(Path(path).read_text(encoding="utf-8"))
         verify_identity(result, attempt)
         if attempt["permission_at"] is None or result.host_sequence < attempt["host_sequence"]:
@@ -54,6 +66,11 @@ class Supervisor:
         host = None
         try:
             attempt, task = self.current(original)
+            if task["snapshot"]["target"]["platform"] == "bilibili":
+                from upload_platform.adapters.bilibili.runtime import execute
+
+                execute(self, original)
+                return
             if task["cancel_requested_at"]:
                 self.store.finish(original, "cancelled", proof="no_execution_intent")
                 return
@@ -228,13 +245,26 @@ class Supervisor:
                 error = "invalid_result"
             if result:
                 outcome = result["outcome"]
-            elif attempt["permission_at"] is None:
+            elif (
+                attempt["handed_off_at"]
+                if task["snapshot"]["target"]["platform"] == "bilibili"
+                else attempt["permission_at"]
+            ) is None:
                 outcome = "cancelled" if task["cancel_requested_at"] else "retryable"
             else:
                 outcome = "uncertain"
             self.store.finish(
                 original, outcome, proof=proof, result=result, error=error, recovery=True
             )
+            if outcome == "uncertain" and task["snapshot"]["target"]["platform"] == "bilibili":
+                from upload_platform.application.remote_queries import RemoteQueries
+
+                try:
+                    RemoteQueries(Service(self.store.database)).query(
+                        task["id"], original["execution_id"]
+                    )
+                except Problem:
+                    pass  # One bounded query only; missing evidence never authorizes another upload.
         finally:
             stop.set()
             thread.join(timeout=self.config.heartbeat_seconds + 1)
@@ -253,6 +283,11 @@ class Worker:
     def run(self):
         self.database.initialize()
         self.store.register()
+        from upload_platform.application.accounts import Accounts
+
+        accounts = Accounts(Service(self.database))
+        accounts.startup_validate()
+        accounts.recover_observers()
 
         def schedule_loop():
             while not self.stop.is_set():
@@ -264,6 +299,17 @@ class Worker:
 
         scheduler_thread = threading.Thread(target=schedule_loop, daemon=True)
         scheduler_thread.start()
+
+        def maintenance_loop():
+            while not self.stop.is_set():
+                try:
+                    accounts.run_automatic_once()
+                except Exception as exc:
+                    logger.warning("account maintenance deferred: %s", type(exc).__name__)
+                self.stop.wait(max(self.config.poll_seconds, 1))
+
+        maintenance_thread = threading.Thread(target=maintenance_loop, daemon=True)
+        maintenance_thread.start()
         futures = set()
         try:
             with ThreadPoolExecutor(max_workers=16, thread_name_prefix="upload-supervisor") as pool:
@@ -288,4 +334,5 @@ class Worker:
         finally:
             self.stop.set()
             scheduler_thread.join(timeout=self.config.lease_seconds)
+            maintenance_thread.join(timeout=self.config.lease_seconds)
             self.store.worker_heartbeat("STOPPED")

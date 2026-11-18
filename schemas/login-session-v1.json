@@ -1,0 +1,255 @@
+{
+  "$defs": {
+    "AccountSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "platform": {
+          "title": "Platform",
+          "type": "string"
+        },
+        "reference": {
+          "title": "Reference",
+          "type": "string"
+        },
+        "remote_user_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Remote User Id"
+        },
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "availability": {
+          "enum": [
+            "ready",
+            "disabled",
+            "blocked"
+          ],
+          "title": "Availability",
+          "type": "string"
+        },
+        "block_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Block Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "platform",
+        "reference",
+        "remote_user_id",
+        "display_name",
+        "enabled",
+        "availability",
+        "block_reasons"
+      ],
+      "title": "AccountSummary",
+      "type": "object"
+    },
+    "Challenge": {
+      "additionalProperties": false,
+      "properties": {
+        "challenge_id": {
+          "title": "Challenge Id",
+          "type": "string"
+        },
+        "image_path": {
+          "title": "Image Path",
+          "type": "string"
+        },
+        "expires_at": {
+          "default": null,
+          "title": "Expires At",
+          "type": "null"
+        },
+        "deadline_at": {
+          "title": "Deadline At",
+          "type": "string"
+        },
+        "expiry_source": {
+          "const": "local",
+          "default": "local",
+          "title": "Expiry Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "challenge_id",
+        "image_path",
+        "deadline_at"
+      ],
+      "title": "Challenge",
+      "type": "object"
+    },
+    "LoginError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "LoginError",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "session_id": {
+      "title": "Session Id",
+      "type": "string"
+    },
+    "operation_id": {
+      "title": "Operation Id",
+      "type": "string"
+    },
+    "platform": {
+      "const": "bilibili",
+      "default": "bilibili",
+      "title": "Platform",
+      "type": "string"
+    },
+    "account_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Account Id"
+    },
+    "revision": {
+      "title": "Revision",
+      "type": "integer"
+    },
+    "phase": {
+      "enum": [
+        "queued",
+        "waiting_for_executions",
+        "starting",
+        "waiting_confirmation",
+        "verifying_identity",
+        "waiting_for_account",
+        "finalizing",
+        "cancelling",
+        "recovering",
+        "finished"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "outcome": {
+      "anyOf": [
+        {
+          "enum": [
+            "succeeded",
+            "cancelled",
+            "expired",
+            "failed"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Outcome"
+    },
+    "created_at": {
+      "title": "Created At",
+      "type": "string"
+    },
+    "updated_at": {
+      "title": "Updated At",
+      "type": "string"
+    },
+    "can_cancel": {
+      "title": "Can Cancel",
+      "type": "boolean"
+    },
+    "can_resume": {
+      "title": "Can Resume",
+      "type": "boolean"
+    },
+    "can_retry": {
+      "title": "Can Retry",
+      "type": "boolean"
+    },
+    "challenge": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Challenge"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "account_summary": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AccountSummary"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LoginError"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "session_id",
+    "operation_id",
+    "account_id",
+    "revision",
+    "phase",
+    "outcome",
+    "created_at",
+    "updated_at",
+    "can_cancel",
+    "can_resume",
+    "can_retry",
+    "challenge",
+    "account_summary",
+    "error"
+  ],
+  "title": "LoginView",
+  "type": "object"
+}

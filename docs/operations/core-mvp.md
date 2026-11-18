@@ -1,6 +1,6 @@
 # Core MVP 本机运行
 
-当前仅支持 Windows 本机的 Fake 上传闭环。API 与 Worker 是独立进程，共用本机可靠文件系统上的 SQLite；CLI 的业务操作只走 HTTP。真实 Bilibili/百度网盘、SDK、Dashboard、网页接收、Cron、远程访问和历史库升级尚未实现。验收范围见[需求](../需求说明.md)，证据见[实施结果](../../archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
+本文介绍 Windows 本机 Core 的通用运行和 Fake 上传闭环。API 与 Worker 是独立进程，共用本机可靠文件系统上的 SQLite；CLI 的业务操作只走 HTTP。Bilibili 集成的新增配置、账号操作及未验收边界见[Bilibili 操作说明](bilibili.md)。百度网盘、SDK、Dashboard、网页接收、Cron、远程访问和历史库升级尚未实现。Fake 验收证据见[实施结果](../../archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
 
 ## 安装与启动
 

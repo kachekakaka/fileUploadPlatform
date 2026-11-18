@@ -18,6 +18,7 @@ class Config:
     poll_seconds: float = 0.25
     busy_timeout_ms: int = 5000
     requests_dir: Path | None = None
+    bilibili: object | None = None
 
     def __post_init__(self):
         if not self.data_dir.is_absolute():
@@ -25,6 +26,15 @@ class Config:
         from upload_platform.infrastructure.files import lexical_root
 
         lexical_root(str(self.data_dir))
+        if self.bilibili is not None:
+            from upload_platform.adapters.bilibili.config import EngineConfig
+
+            if not isinstance(self.bilibili, EngineConfig):
+                raise Problem("configuration", "Bilibili 部署配置类型无效")
+            state = self.bilibili.state_root.resolve()
+            data = self.data_dir.resolve()
+            if state == data or state.is_relative_to(data) or data.is_relative_to(state):
+                raise Problem("configuration", "引擎私有状态目录必须与 Core 数据目录分离")
         if self.requests_dir is not None:
             lexical_root(str(self.requests_dir))
         parsed = urlsplit(self.api_url)
@@ -86,4 +96,8 @@ class Config:
                 values[field] = float(value)
         if os.getenv("UPLOAD_PLATFORM_REQUESTS_DIR"):
             values["requests_dir"] = Path(os.environ["UPLOAD_PLATFORM_REQUESTS_DIR"])
+        if os.getenv("UPLOAD_PLATFORM_BILIBILI_CONFIG"):
+            from upload_platform.adapters.bilibili.config import EngineConfig
+
+            values["bilibili"] = EngineConfig.load(os.environ["UPLOAD_PLATFORM_BILIBILI_CONFIG"])
         return cls(**values)

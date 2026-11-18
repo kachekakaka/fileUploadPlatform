@@ -37,9 +37,7 @@ def page_args(parser):
 
 
 def parser():
-    root = argparse.ArgumentParser(
-        prog="upload-platform", description="本机作品上传编排（Fake Adapter）"
-    )
+    root = argparse.ArgumentParser(prog="upload-platform", description="本机作品上传编排")
     root.add_argument("--json", action="store_true")
     groups = root.add_subparsers(dest="group", required=True)
     for name in ("server", "worker", "doctor"):
@@ -74,6 +72,8 @@ def parser():
         "events",
         "attempts",
         "resolutions",
+        "query",
+        "queries",
     ):
         command = task.add_parser(name)
         command.add_argument("id")
@@ -104,6 +104,14 @@ def parser():
             page_args(command)
     requests = groups.add_parser("request").add_subparsers(dest="action", required=True)
     requests.add_parser("resume").add_argument("id")
+    accounts = groups.add_parser("account").add_subparsers(dest="action", required=True)
+    accounts.add_parser("list")
+    login = accounts.add_parser("login")
+    login.add_argument("--account-id")
+    login.add_argument("--import-file")
+    for name in ("validate", "renew", "enable", "disable"):
+        accounts.add_parser(name).add_argument("id")
+    accounts.add_parser("resume").add_argument("id")
     return root
 
 
@@ -215,6 +223,28 @@ def follow_events(client, args):
 
 def dispatch(args, client):
     group, action = args.group, getattr(args, "action", None)
+    if group == "task" and action in ("query", "queries"):
+        if action == "queries":
+            return client.read(f"/tasks/{args.id}/queries")
+        client.http.timeout = httpx.Timeout(120)
+        return client.mutate("POST", f"/tasks/{args.id}/query", {})
+    if group == "account":
+        if action == "list":
+            return client.read("/accounts")
+        if action in ("enable", "disable"):
+            return client.mutate("PATCH", "/accounts/" + args.id, {"enabled": action == "enable"})
+        from upload_platform.cli.accounts import maintain
+
+        if action == "resume":
+            return maintain(client, "login", operation_id=args.id)
+        return maintain(
+            client,
+            action,
+            getattr(args, "account_id", None) if action == "login" else args.id,
+            import_file=str(Path(args.import_file).absolute())
+            if getattr(args, "import_file", None)
+            else None,
+        )
     if group == "doctor":
         return client.read("/system/health")
     if group == "request":

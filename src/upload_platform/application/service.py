@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import select, insert, update
 
+from upload_platform.adapters.bilibili.b18 import B18Allowlist, denied
 from upload_platform.application.contracts import (
     Registration,
     Submission,
@@ -137,7 +138,19 @@ class Service:
                 if target["enabled"]:
                     seen.add(identity)
                 target["account_id"] = account["id"]
+                if target["platform"] == "bilibili":
+                    if not account["enabled"]:
+                        raise Problem("invalid_account", "目标账号已手动停用", 409)
+                    target["expected_mid"] = account["remote_user_id"]
         # Expanded targets refer to the same objects in the normalized manifest.
+        from upload_platform.adapters.bilibili.mapping import validate_item
+
+        permit = B18Allowlist.load(self.database.config)
+        if permit:
+            permit.check_prepared(prepared)
+        for item in prepared["expanded"]:
+            if item["target"]["platform"] == "bilibili":
+                validate_item(item, self.database.config.bilibili, b18=permit)
         return prepared
 
     def save_work(self, conn, prepared):
@@ -153,6 +166,8 @@ class Service:
         for unit in public["upload_units"]:
             for target in unit["targets"]:
                 target.pop("account_id", None)
+                target.pop("expected_mid", None)
+                target.pop("engine_build_id", None)
         values = {"root_id": root["id"], "manifest": public, "updated_at": at}
         if existing:
             conn.execute(update(db.works).where(db.works.c.id == work_id).values(**values))
@@ -231,12 +246,14 @@ class Service:
             conn, select(db.ledgers).where(*[db.ledgers.c[k] == v for k, v in identity.items()])
         )
 
-    def create_task(self, conn, item, ledger, prepared, saved, execution, previous=None):
+    def create_task(self, conn, item, ledger, prepared, saved, execution, previous=None, b18=None):
         at, task_id = self.clock(), uid()
         planned = (
             timestamp(execution.scheduled_at) if execution.execution_type == "scheduled" else at
         )
         snapshot = {**item, "root_id": saved["root_id"], "directory": prepared["directory"]}
+        if b18:
+            snapshot["b18_run_id"] = b18.run_id
         snapshot["assets"] = [
             {**ref, "relative_path": prepared["assets"][ref["asset_id"]]["relative_path"]}
             for ref in item["assets"]
@@ -301,14 +318,21 @@ class Service:
             "previous_task_id": previous,
         }
 
-    def submit_prepared(self, conn, prepared, execution, *, previous=None):
+    def submit_prepared(self, conn, prepared, execution, *, previous=None, from_schedule=False):
         if not prepared["expanded"]:
             raise Problem("no_targets", "没有启用的上传目标")
         work_id = prepared["manifest"]["work"]["id"]
         items = prepared["expanded"]
+        permit = B18Allowlist.load(self.database.config)
+        if permit:
+            permit.check_slot(
+                conn, prepared, execution, previous=previous, from_schedule=from_schedule
+            )
         old = None
         if previous:
             old = db.get(conn, db.tasks, previous)
+            if "b18_run_id" in old["snapshot"] and not (permit and permit.supplement):
+                raise denied("B18 名额已使用，不能重新投稿或安排")
             ledger = db.get(conn, db.ledgers, old["ledger_id"])
             if old["status"] not in DEFINITE or ledger["current_task_id"] != previous:
                 raise Problem(
@@ -346,7 +370,7 @@ class Service:
                 ledger = {"id": uid(), **identity, "round": 0}
                 conn.execute(insert(db.ledgers).values(**ledger))
             response.append(
-                self.create_task(conn, item, ledger, prepared, saved, execution, previous)
+                self.create_task(conn, item, ledger, prepared, saved, execution, previous, permit)
             )
         return {"work_id": work_id, "tasks": response}
 
@@ -408,6 +432,8 @@ class Service:
         for unit in public["manifest"]["upload_units"]:
             for target in unit["targets"]:
                 target.pop("account_id", None)
+                target.pop("expected_mid", None)
+                target.pop("engine_build_id", None)
         return public
 
     def submit(self, work_id, key, request: Submission, previous=None):
@@ -428,6 +454,29 @@ class Service:
     def cancel(self, task_id, key, request):
         def action(conn, _):
             task, at = db.get(conn, db.tasks, task_id), self.clock()
+            if (
+                task["snapshot"]["target"]["platform"] == "bilibili"
+                and task["status"] not in TERMINAL
+                and task["current_attempt_id"]
+            ):
+                attempt = db.get(conn, db.attempts, task["current_attempt_id"])
+                safe_next_attempt = (
+                    task["status"] == "RETRY_WAIT"
+                    and attempt["exit_confirmed"]
+                    and not db.one(
+                        conn,
+                        select(db.leases).where(
+                            db.leases.c.attempt_id == attempt["id"],
+                            db.leases.c.released_at.is_(None),
+                        ),
+                    )
+                )
+                if attempt["handed_off_at"] is not None and not safe_next_attempt:
+                    raise Problem(
+                        "cancellation_not_supported_after_handoff",
+                        "任务已交接给 Bilibili 引擎，首版不支持取消该次执行",
+                        409,
+                    )
             if task["status"] not in TERMINAL:
                 if task["status"] in ("QUEUED", "RETRY_WAIT"):
                     task = task_state(conn, task, "CANCELLED", at, cancel_requested_at=at)
@@ -468,6 +517,14 @@ class Service:
                     raise Problem("resolve_conflict", "仅可处置 UNCERTAIN", 409)
                 attempt = db.get(conn, db.attempts, task["current_attempt_id"])
             if request.conclusion != "uncertain":
+                if task["snapshot"]["target"]["platform"] == "bilibili":
+                    if not attempt["exit_confirmed"] or not request.evidence_refs:
+                        raise Problem(
+                            "insufficient_evidence",
+                            "人工处置需要旧执行树退出记录和明确核验依据",
+                            409,
+                        )
+                    return attempt["id"]
                 ref = f"fake://{attempt['execution_id']}/observation"
                 if not attempt["exit_confirmed"] or ref not in request.evidence_refs:
                     raise Problem(
@@ -499,6 +556,8 @@ class Service:
             if request.conclusion != "uncertain" and not attempt["exit_confirmed"]:
                 raise Problem("exit_unconfirmed", "旧执行尚未确认退出", 409)
             resolution_id, at = uid(), self.clock()
+            bilibili = task["snapshot"]["target"]["platform"] == "bilibili"
+            source = "manual-bilibili" if bilibili else "manual-fake"
             conn.execute(
                 insert(db.resolutions).values(
                     id=resolution_id,
@@ -507,7 +566,7 @@ class Service:
                     conclusion=request.conclusion,
                     reason=request.reason,
                     evidence_refs=request.evidence_refs,
-                    source="manual-fake",
+                    source=source,
                     created_at=at,
                 )
             )
@@ -517,7 +576,7 @@ class Service:
                     task,
                     request.conclusion.upper(),
                     at,
-                    payload={"resolution_id": resolution_id, "source": "manual-fake"},
+                    payload={"resolution_id": resolution_id, "source": source},
                 )
                 if request.conclusion == "succeeded":
                     conn.execute(
@@ -526,7 +585,7 @@ class Service:
                             task_id=task_id,
                             attempt_id=attempt_id,
                             source="manual",
-                            fake=True,
+                            fake=not bilibili,
                             evidence=request.evidence_refs,
                         )
                     )
@@ -580,7 +639,7 @@ class Service:
             task["receipt"] = db.one(
                 conn, select(db.receipts).where(db.receipts.c.task_id == task_id)
             )
-            if task["attempt"]:
+            if task["attempt"] and task["snapshot"]["target"]["platform"] == "fake":
                 task["evidence_ref"] = f"fake://{task['attempt']['execution_id']}/observation"
             return task
 

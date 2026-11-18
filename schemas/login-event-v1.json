@@ -1,0 +1,119 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "enum": [
+        "login_qr_ready",
+        "login_progress"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "protocol_version": {
+      "const": 1,
+      "title": "Protocol Version",
+      "type": "integer"
+    },
+    "interaction_version": {
+      "const": 1,
+      "title": "Interaction Version",
+      "type": "integer"
+    },
+    "engine_build_id": {
+      "title": "Engine Build Id",
+      "type": "string"
+    },
+    "operation_id": {
+      "format": "uuid",
+      "title": "Operation Id",
+      "type": "string"
+    },
+    "seq": {
+      "exclusiveMinimum": 0,
+      "title": "Seq",
+      "type": "integer"
+    },
+    "challenge_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Challenge Id"
+    },
+    "png_base64": {
+      "anyOf": [
+        {
+          "maxLength": 175000,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Png Base64"
+    },
+    "deadline_at": {
+      "anyOf": [
+        {
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Deadline At"
+    },
+    "expires_at": {
+      "default": null,
+      "title": "Expires At",
+      "type": "null"
+    },
+    "expiry_source": {
+      "anyOf": [
+        {
+          "const": "local",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expiry Source"
+    },
+    "phase": {
+      "anyOf": [
+        {
+          "enum": [
+            "waiting_confirmation",
+            "verifying_identity"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Phase"
+    }
+  },
+  "required": [
+    "type",
+    "protocol_version",
+    "interaction_version",
+    "engine_build_id",
+    "operation_id",
+    "seq"
+  ],
+  "title": "LoginEvent",
+  "type": "object"
+}

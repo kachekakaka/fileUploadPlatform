@@ -1,0 +1,39 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "category_id": {
+      "maximum": 65535,
+      "minimum": 1,
+      "title": "Category Id",
+      "type": "integer"
+    },
+    "copyright": {
+      "enum": [
+        1,
+        2
+      ],
+      "title": "Copyright",
+      "type": "integer"
+    },
+    "source": {
+      "default": "",
+      "title": "Source",
+      "type": "string"
+    },
+    "publish_mode": {
+      "enum": [
+        "public",
+        "self_only"
+      ],
+      "title": "Publish Mode",
+      "type": "string"
+    }
+  },
+  "required": [
+    "category_id",
+    "copyright",
+    "publish_mode"
+  ],
+  "title": "BilibiliOptions",
+  "type": "object"
+}

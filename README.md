@@ -2,9 +2,11 @@
 
 目标是独立运行的上传应用，提供 REST API、Python SDK、CLI 和 Web Dashboard，首批支持 Bilibili 与百度网盘。
 
-当前已实现 Windows 本机 Core MVP：作品描述与文件引用、REST API、HTTP CLI、独立 Worker、受监督的 Fake Adapter、立即/一次性/每日/每周任务、请求重放与执行恢复。原实施结果见 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)，后续边界修复与补验见[审查修复结果](archive/方案/20261116-Core-MVP审查修复.md#实际结果)。Fake 回执仅为模拟；Bilibili、百度网盘、SDK、Dashboard、网页文件接收和 Cron 尚未实现。
+当前已实现 Windows 本机 Core MVP：作品描述与文件引用、REST API、HTTP CLI、独立 Worker、受监督的 Fake Adapter、立即/一次性/每日/每周任务、请求重放与执行恢复。原实施结果见 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)，后续边界修复与补验见[审查修复结果](archive/方案/20261116-Core-MVP审查修复.md#实际结果)。Bilibili 本地引擎与 Core 集成正在实施，已有登录维护、直接执行、主动查询及独立进程验证；真实平台受理尚未验收，不能视为完整交付，实际状态见[集成实施记录](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#23-产品实施记录2026-11-17)，登录运行入口见[Bilibili 操作说明](docs/operations/bilibili.md)。Fake 回执仍仅为模拟；百度网盘、SDK、Dashboard、网页文件接收和 Cron 尚未实现。
 
 ## 按任务查阅
+
+mumu 本机账号页已通过真实 B 站扫码登录验收，重开控制台还能找回同一次登录。B18 的公开单 P 和多 P 均已过审，并通过创作中心核对与播放验证。多 P 首次传输失败，已在受控补测中通过。[真实试投记录](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#238-b18-公开试投记录) · [多 P 补测](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#2310-b18-多-p-补测) · [扫码验收记录](docs/方案/20261117-mumu界面扫码登录接入方案.md#14-本机真实扫码验收)
 
 | 需要处理的事情 | 当前入口 |
 | --- | --- |

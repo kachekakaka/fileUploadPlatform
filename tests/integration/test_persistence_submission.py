@@ -19,7 +19,8 @@ def count(database, table):
         return conn.execute(select(func.count()).select_from(table)).scalar_one()
 
 
-def test_initialize_concurrent_reopen_and_connection_pragmas(config):
+@pytest.mark.parametrize("_round", range(10))
+def test_initialize_concurrent_reopen_and_connection_pragmas(config, _round):
     def initialize(_):
         database = db.Database(config)
         try:

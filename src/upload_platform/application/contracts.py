@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 import re
 
@@ -91,11 +91,41 @@ class FakeOptions(StrictModel):
     failures_before_success: int = Field(default=0, ge=0)
 
 
-class Target(StrictModel):
+class FakeTarget(StrictModel):
     platform: Literal["fake"] = "fake"
     account: str = "fake-default"
     enabled: bool = True
     options: FakeOptions = Field(default_factory=FakeOptions)
+
+
+class BilibiliOptions(StrictModel):
+    category_id: int = Field(ge=1, le=65535)
+    copyright: Literal[1, 2]
+    source: str = ""
+    publish_mode: Literal["public", "self_only"]
+
+    @field_validator("copyright", mode="before")
+    @classmethod
+    def integer_copyright(cls, value):
+        if type(value) is not int:
+            raise ValueError("copyright 必须为整数")
+        return value
+
+    @model_validator(mode="after")
+    def explicit_source(self):
+        if (self.copyright == 2) != bool(self.source.strip()):
+            raise ValueError("转载必须填写来源，自制不能混入转载来源")
+        return self
+
+
+class BilibiliTarget(StrictModel):
+    platform: Literal["bilibili"]
+    account: str = Field(min_length=1)
+    enabled: bool = True
+    options: BilibiliOptions
+
+
+Target = Annotated[FakeTarget | BilibiliTarget, Field(discriminator="platform")]
 
 
 class Unit(StrictModel):
@@ -104,6 +134,15 @@ class Unit(StrictModel):
     metadata_overrides: Metadata = Field(default_factory=Metadata)
     videos: list[str] = Field(min_length=1)
     targets: list[Target] = Field(default_factory=list)
+
+    @field_validator("targets", mode="before")
+    @classmethod
+    def legacy_fake_default(cls, value):
+        if isinstance(value, list):
+            return [
+                {"platform": "fake", **item} if isinstance(item, dict) else item for item in value
+            ]
+        return value
 
 
 class Manifest(StrictModel):

@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from pathlib import Path
 import re
+import sqlite3
+import time
 
 from sqlalchemy import (
     MetaData,
@@ -28,6 +30,7 @@ from upload_platform.domain.core import Problem, uid, now, TASK_TRANSITIONS, ATT
 
 
 metadata = MetaData()
+SCHEMA_VERSION = 2
 
 
 def col(name, kind=String, **kw):
@@ -50,7 +53,52 @@ accounts = table(
     col("display_name", nullable=False),
     col("status", nullable=False),
     col("concurrency_limit", Integer, nullable=False),
+    col("remote_user_id"),
+    col("credential_reference"),
+    col("enabled", Boolean, nullable=False, server_default="1"),
+    col("version", Integer, nullable=False, server_default="1"),
     CheckConstraint("concurrency_limit > 0"),
+    UniqueConstraint("platform", "remote_user_id"),
+    CheckConstraint("platform IN ('fake','bilibili')"),
+    CheckConstraint(
+        "platform != 'bilibili' OR (concurrency_limit <= 3 AND remote_user_id IS NOT NULL AND remote_user_id != '' AND remote_user_id NOT GLOB '*[^0-9]*' AND substr(remote_user_id,1,1) != '0' AND credential_reference IS NOT NULL)"
+    ),
+)
+account_blocks = table(
+    "account_blocks",
+    ref("account_id", "accounts.id", nullable=False),
+    col("reason", nullable=False),
+    col("owner", nullable=False),
+    col("created_at", Float, nullable=False),
+    UniqueConstraint("account_id", "reason", "owner"),
+)
+account_maintenance = table(
+    "account_maintenance",
+    ref("account_id", "accounts.id"),
+    col("kind", nullable=False),
+    col("status", nullable=False),
+    col("generation", Integer, nullable=False),
+    col("expected_mid"),
+    col("old_credential_reference"),
+    col("credential_reference"),
+    col("execution", JSON, nullable=False),
+    col("result", JSON),
+    col("error"),
+    col("created_at", Float, nullable=False),
+    col("updated_at", Float, nullable=False),
+    CheckConstraint("generation > 0"),
+    CheckConstraint("kind IN ('login','renew','validate')"),
+    CheckConstraint(
+        "status IN ('WAITING','READY','STARTING','RUNNING','VERIFYING','SUCCEEDED','FAILED','UNCERTAIN')"
+    ),
+)
+Index(
+    "one_active_account_maintenance",
+    account_maintenance.c.account_id,
+    unique=True,
+    sqlite_where=account_maintenance.c.status.in_(
+        ["WAITING", "READY", "STARTING", "RUNNING", "VERIFYING", "UNCERTAIN"]
+    ),
 )
 roots = table("source_roots", col("directory", nullable=False, unique=True))
 works = table(
@@ -165,6 +213,7 @@ attempts = table(
     col("fence", Integer, nullable=False),
     col("execution", JSON, nullable=False),
     col("permission_at", Float),
+    col("handed_off_at", Float),
     col("exit_confirmed", Boolean, nullable=False),
     col("host_sequence", Integer, nullable=False),
     col("result", JSON),
@@ -194,6 +243,21 @@ counters = table(
     col("generation", Integer, nullable=False),
     UniqueConstraint("scope", "slot"),
     CheckConstraint("generation > 0"),
+)
+remote_queries = table(
+    "remote_queries",
+    ref("account_id", "accounts.id", nullable=False),
+    ref("task_id", "tasks.id", nullable=False),
+    col("status", nullable=False),
+    col("generation", Integer, nullable=False),
+    col("execution", JSON, nullable=False),
+    col("result", JSON),
+    col("error"),
+    col("started_at", Float, nullable=False),
+    col("ended_at", Float),
+    CheckConstraint("status IN ('STARTING','RUNNING','FINISHED','UNCERTAIN')"),
+    CheckConstraint("generation > 0"),
+    UniqueConstraint("task_id", "generation"),
 )
 leases = table(
     "leases",
@@ -236,6 +300,11 @@ receipts = table(
     col("source", nullable=False),
     col("fake", Boolean, nullable=False),
     col("evidence", JSON, nullable=False),
+    col("review_status", JSON),
+    col("last_query_at", Float),
+    col("query_started_at", Float),
+    col("query_generation", Integer, nullable=False, server_default="0"),
+    col("query_error"),
 )
 resolutions = table(
     "resolutions",
@@ -400,13 +469,36 @@ class Database:
                 conn.rollback()
 
     def initialize(self):
+        # Inspect an existing file through a read-only connection before any write transaction
+        # or journal configuration. Revalidate under the initialization transaction for races.
+        if self.config.database.exists() and self.config.database.stat().st_size:
+            try:
+                with sqlite3.connect(self.config.database.as_uri() + "?mode=ro", uri=True) as probe:
+                    existing = probe.execute(
+                        "SELECT name, sql FROM sqlite_master WHERE type IN ('table','index') AND name NOT LIKE 'sqlite_%'"
+                    ).fetchall()
+                    if existing:
+                        self._validate_structure(existing)
+                        versions = probe.execute(
+                            "SELECT id, version FROM schema_version"
+                        ).fetchall()
+                        if versions != [("core", SCHEMA_VERSION)]:
+                            raise Problem(
+                                "unsupported_database",
+                                "数据库版本不受支持；请使用新的独立运行目录",
+                                503,
+                            )
+            except sqlite3.DatabaseError as exc:
+                raise Problem(
+                    "unsupported_database", "无法只读核验数据库；保留原库并停止", 503
+                ) from exc
         with self.transaction() as conn:
             existing = conn.exec_driver_sql(
                 "SELECT name, sql FROM sqlite_master WHERE type IN ('table','index') AND name NOT LIKE 'sqlite_%'"
             ).all()
             if not existing:
                 metadata.create_all(conn)
-                conn.execute(insert(schema_version).values(id="core", version=1))
+                conn.execute(insert(schema_version).values(id="core", version=SCHEMA_VERSION))
                 conn.execute(
                     insert(accounts).values(
                         id=uid(),
@@ -418,35 +510,54 @@ class Database:
                     )
                 )
             else:
-                actual = {name: _sql_normalize(sql) for name, sql in existing if sql}
-                expected = {
-                    t.name: _sql_normalize(str(CreateTable(t).compile(self.engine)))
-                    for t in metadata.tables.values()
-                }
-                for t in metadata.tables.values():
-                    expected.update(
-                        {
-                            i.name: _sql_normalize(str(CreateIndex(i).compile(self.engine)))
-                            for i in t.indexes
-                        }
-                    )
-                if actual != expected:
-                    raise Problem(
-                        "unsupported_database",
-                        "数据库不是受支持的完整 Core schema；保留原库并停止",
-                        503,
-                    )
+                self._validate_structure(existing)
                 version = one(conn, select(schema_version))
-                if not version or version["version"] != 1:
+                if not version or version["version"] != SCHEMA_VERSION:
                     raise Problem("unsupported_database", "数据库版本不受支持", 503)
                 if conn.exec_driver_sql("PRAGMA foreign_key_check").first():
                     raise Problem("invalid_database", "数据库外键一致性检查失败", 503)
                 fake = one(conn, select(accounts).where(accounts.c.reference == "fake-default"))
                 if not fake or fake["platform"] != "fake":
                     raise Problem("invalid_database", "系统 Fake Account 缺失或损坏", 503)
-        with self.engine.connect() as conn:
-            if conn.exec_driver_sql("PRAGMA journal_mode=WAL").scalar_one().lower() != "wal":
-                raise Problem("configuration", "数据库无法使用 WAL", 503)
+        # Concurrent initializers can hold read/reserved locks while another switches
+        # the journal. SQLite may return BUSY immediately for this lock upgrade even
+        # with busy_timeout; retry only that idempotent configuration, after validation.
+        deadline = time.monotonic() + self.config.busy_timeout_ms / 1000
+        while True:
+            try:
+                with self.engine.connect() as conn:
+                    if (
+                        conn.exec_driver_sql("PRAGMA journal_mode=WAL").scalar_one().lower()
+                        != "wal"
+                    ):
+                        raise Problem("configuration", "数据库无法使用 WAL", 503)
+                break
+            except OperationalError as exc:
+                code = getattr(exc.orig, "sqlite_errorcode", 0) & 0xFF
+                if (
+                    code not in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
+                    or time.monotonic() >= deadline
+                ):
+                    raise
+                time.sleep(0.02)
+
+    def _validate_structure(self, existing):
+        actual = {name: _sql_normalize(sql) for name, sql in existing if sql}
+        expected = {
+            t.name: _sql_normalize(str(CreateTable(t).compile(self.engine)))
+            for t in metadata.tables.values()
+        }
+        for relation in metadata.tables.values():
+            expected.update(
+                {
+                    index.name: _sql_normalize(str(CreateIndex(index).compile(self.engine)))
+                    for index in relation.indexes
+                }
+            )
+        if actual != expected:
+            raise Problem(
+                "unsupported_database", "数据库不是受支持的完整 Core schema；保留原库并停止", 503
+            )
 
     def close(self):
         self.engine.dispose()

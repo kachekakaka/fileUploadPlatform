@@ -5,7 +5,14 @@ import os
 from pathlib import Path
 
 from upload_platform.api.app import create_app
-from upload_platform.application.contracts import Manifest, FakeOptions
+from upload_platform.application.contracts import Manifest, FakeOptions, BilibiliOptions
+from upload_platform.adapters.bilibili.protocol import Message, Result
+from upload_platform.application.login_sessions import (
+    LoginEvent,
+    LoginRequest,
+    LoginView,
+    AccountSummary,
+)
 from upload_platform.config import Config
 from upload_platform.execution.protocol import HostRequest, HostEvent, HostResult, Command
 
@@ -18,6 +25,13 @@ def main():
     for name, model in [
         ("manifest-v1", Manifest),
         ("fake-options-v1", FakeOptions),
+        ("bilibili-options-v1", BilibiliOptions),
+        ("bilibili-event-v1", Message),
+        ("bilibili-result-v1", Result),
+        ("login-event-v1", LoginEvent),
+        ("login-request-v1", LoginRequest),
+        ("login-session-v1", LoginView),
+        ("account-summary-v1", AccountSummary),
         ("host-request-v1", HostRequest),
         ("host-event-v1", HostEvent),
         ("host-result-v1", HostResult),

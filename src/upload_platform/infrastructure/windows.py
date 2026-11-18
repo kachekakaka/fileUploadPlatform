@@ -5,6 +5,7 @@ from ctypes import wintypes as w
 from functools import lru_cache
 import json
 import os
+from pathlib import Path
 import queue
 import subprocess
 import sys
@@ -124,17 +125,44 @@ def _check(value):
 
 
 class JobHost:
-    def __init__(self, execution, persist_identity, fault=lambda point: None):
+    def __init__(
+        self,
+        execution,
+        persist_identity,
+        fault=lambda point: None,
+        *,
+        command=None,
+        terminal_stderr=False,
+        output_limit=1024 * 1024,
+        output_queue_size=256,
+    ):
         import msvcrt
         import win32api
         import win32job
         import win32process
 
+        # The caller supplies a deployment-controlled executable, never a command from a work.
+        argv = (
+            [sys.executable, "-m", "upload_platform.adapters.fake.host"]
+            if command is None
+            else command
+        )
+        if (
+            not isinstance(argv, (list, tuple))
+            or not argv
+            or any(not isinstance(arg, str) or "\x00" in arg for arg in argv)
+            or not Path(argv[0]).is_absolute()
+            or not Path(argv[0]).is_file()
+        ):
+            raise Problem("invalid_engine_command", "引擎需要可信绝对可执行路径和参数数组", 503)
+        argv = list(argv)
         self.execution = execution
         self.job = win32job.CreateJobObject(None, execution["job_name"])
         self.process = self.thread = None
         self.stdin = self.stdout = None
-        self.messages = queue.Queue()
+        self.messages = queue.Queue(maxsize=output_queue_size)
+        self.protocol_overflow = False
+        self.write_in_progress = False
         limits = win32job.QueryInformationJobObject(
             self.job, win32job.JobObjectExtendedLimitInformation
         )
@@ -145,8 +173,17 @@ class JobHost:
         kernel = _kernel()
         in_read, in_write = os.pipe()
         out_read, out_write = os.pipe()
-        err_fd = os.open(execution["stderr_path"], os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        err_fd = (
+            os.dup(sys.stderr.fileno())
+            if terminal_stderr
+            else os.open(execution["stderr_path"], os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        )
         owned_fds = {in_read, in_write, out_read, out_write, err_fd}
+        private_stderr = not terminal_stderr and "engine_build_id" in execution
+        if private_stderr:
+            log_fd = err_fd
+            err_read, err_fd = os.pipe()
+            owned_fds.update((err_read, err_fd))
         attribute_list = None
         try:
             child_handles = [msvcrt.get_osfhandle(fd) for fd in (in_read, out_write, err_fd)] + [
@@ -184,15 +221,11 @@ class JobHost:
             ) = child_handles[:3]
             startup.lpAttributeList = attribute_list
             info = PROCESS_INFORMATION()
-            command = ctypes.create_unicode_buffer(
-                subprocess.list2cmdline(
-                    [sys.executable, "-m", "upload_platform.adapters.fake.host"]
-                )
-            )
+            command_line = ctypes.create_unicode_buffer(subprocess.list2cmdline(argv))
             _check(
                 kernel.CreateProcessW(
-                    sys.executable,
-                    command,
+                    argv[0],
+                    command_line,
                     None,
                     None,
                     True,
@@ -223,6 +256,26 @@ class JobHost:
             owned_fds.remove(in_write)
             self.stdout = os.fdopen(out_read, "r", encoding="utf-8")
             owned_fds.remove(out_read)
+            if private_stderr:
+                source, destination = os.fdopen(err_read, "rb"), os.fdopen(log_fd, "wb")
+                owned_fds.remove(err_read)
+                owned_fds.remove(log_fd)
+
+                def drain_private_stderr():
+                    # Third-party diagnostics may contain cookies/URLs. Retain no raw bytes.
+                    # Structured, validated result codes are the operational error evidence.
+                    with source, destination:
+                        recorded = False
+                        while source.read(8192):
+                            if not recorded:
+                                destination.write(
+                                    b"Engine stderr received; consult structured result evidence.\n"
+                                )
+                                destination.flush()
+                                recorded = True
+
+                self.stderr_reader = threading.Thread(target=drain_private_stderr, daemon=True)
+                self.stderr_reader.start()
             _check(kernel.ResumeThread(self.thread) != 0xFFFFFFFF)
             kernel.CloseHandle(self.thread)
             self.thread = None
@@ -243,19 +296,37 @@ class JobHost:
 
         def read_output():
             try:
-                for line in self.stdout:
-                    self.messages.put(line)
+                while True:
+                    line = self.stdout.readline(output_limit + 1)
+                    if not line:
+                        break
+                    if len(line.encode("utf-8")) > output_limit:
+                        self.protocol_overflow = True
+                        while line and not line.endswith("\n"):
+                            line = self.stdout.readline(65536)
+                        continue
+                    try:
+                        self.messages.put_nowait(line)
+                    except queue.Full:
+                        self.protocol_overflow = True
             except (OSError, ValueError):
                 pass
             finally:
-                self.messages.put(None)
+                try:
+                    self.messages.put_nowait(None)
+                except queue.Full:
+                    self.protocol_overflow = True
 
         self.reader = threading.Thread(target=read_output, daemon=True)
         self.reader.start()
 
     def send(self, message):
-        self.stdin.write(json.dumps(message) + "\n")
-        self.stdin.flush()
+        self.write_in_progress = True
+        try:
+            self.stdin.write(json.dumps(message) + "\n")
+            self.stdin.flush()
+        finally:
+            self.write_in_progress = False
 
     def exited(self):
         import win32event
@@ -282,7 +353,7 @@ class JobHost:
 
     def close(self):
         kernel = _kernel()
-        if self.stdin:
+        if self.stdin and not self.write_in_progress:
             self.stdin.close()
             self.stdin = None
         # stdout may be blocked while an uncertain execution remains alive.
@@ -290,6 +361,8 @@ class JobHost:
             self.reader.join(timeout=1)
             if not self.reader.is_alive():
                 self.stdout.close()
+            if hasattr(self, "stderr_reader"):
+                self.stderr_reader.join(timeout=1)
         for name in ("process", "thread"):
             handle = getattr(self, name, None)
             if handle:
@@ -300,7 +373,7 @@ class JobHost:
             self.job = None
 
 
-def stop_verified(execution, timeout=10):
+def stop_verified(execution, timeout=10, *, terminate=True):
     """Return proof, not merely a successful terminate call."""
     import pywintypes
     import win32api
@@ -343,7 +416,8 @@ def stop_verified(execution, timeout=10):
             and not win32job.IsProcessInJob(process, job)
         ):
             return False, "job_membership_mismatch"
-        win32job.TerminateJobObject(job, 77)
+        if terminate:
+            win32job.TerminateJobObject(job, 77)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             active = win32job.QueryInformationJobObject(

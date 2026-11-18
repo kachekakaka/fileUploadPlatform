@@ -327,7 +327,9 @@ class Scheduler:
                 execution = Submission(retry_policy=run["config"]["retry_policy"])
                 with self.database.transaction() as conn:
                     self.owned(conn, run)
-                    response = self.service.submit_prepared(conn, prepared, execution)
+                    response = self.service.submit_prepared(
+                        conn, prepared, execution, from_schedule=True
+                    )
                     result_id = uid()
                     conn.execute(
                         insert(db.run_works).values(

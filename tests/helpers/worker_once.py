@@ -3,6 +3,8 @@
 import inspect
 import os
 import sys
+import time
+from pathlib import Path
 
 from upload_platform.config import Config
 from upload_platform.execution.leases import ExecutionStore
@@ -35,6 +37,10 @@ def main():
                 pid=host.pid, creation_time=process_creation(host.process), execution=host.execution
             )
         write_json(marker, evidence)
+        gate = os.environ.get("UPLOAD_PLATFORM_TEST_CRASH_GATE")
+        if gate:
+            while not Path(gate).exists():
+                time.sleep(0.01)
         os._exit(91)
 
     Supervisor(store, crash).execute(attempt)

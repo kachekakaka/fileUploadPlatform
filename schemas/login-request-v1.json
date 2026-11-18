@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "platform": {
+      "const": "bilibili",
+      "default": "bilibili",
+      "title": "Platform",
+      "type": "string"
+    },
+    "account_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Account Id"
+    }
+  },
+  "title": "LoginRequest",
+  "type": "object"
+}

@@ -1,0 +1,64 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "title": "Id",
+      "type": "string"
+    },
+    "platform": {
+      "title": "Platform",
+      "type": "string"
+    },
+    "reference": {
+      "title": "Reference",
+      "type": "string"
+    },
+    "remote_user_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Remote User Id"
+    },
+    "display_name": {
+      "title": "Display Name",
+      "type": "string"
+    },
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "availability": {
+      "enum": [
+        "ready",
+        "disabled",
+        "blocked"
+      ],
+      "title": "Availability",
+      "type": "string"
+    },
+    "block_reasons": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Block Reasons",
+      "type": "array"
+    }
+  },
+  "required": [
+    "id",
+    "platform",
+    "reference",
+    "remote_user_id",
+    "display_name",
+    "enabled",
+    "availability",
+    "block_reasons"
+  ],
+  "title": "AccountSummary",
+  "type": "object"
+}

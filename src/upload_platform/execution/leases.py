@@ -66,7 +66,13 @@ class ExecutionStore:
                 )
                 .order_by(db.tasks.c.next_attempt_at, db.tasks.c.created_at, db.tasks.c.id),
             )
+            scoped_worker = (
+                self.config.bilibili is not None
+                and self.config.bilibili.b18_allowlist_file is not None
+            )
             for task in candidates:
+                if scoped_worker != ("b18_run_id" in task["snapshot"]):
+                    continue
                 if task["cancel_requested_at"] is not None:
                     task_state(conn, task, "CANCELLED", at)
                     continue
@@ -81,7 +87,16 @@ class ExecutionStore:
                 if task["attempt_count"] >= task["retry_policy"]["max_attempts"]:
                     continue
                 account = db.get(conn, db.accounts, task["account_id"])
-                if account["status"] != "ACTIVE":
+                if (
+                    account["status"] != "ACTIVE"
+                    or not account["enabled"]
+                    or db.one(
+                        conn,
+                        select(db.account_blocks).where(
+                            db.account_blocks.c.account_id == account["id"]
+                        ),
+                    )
+                ):
                     continue
                 account_scope, task_scope = "account:" + account["id"], "task:" + task["id"]
                 occupied = set(
@@ -283,6 +298,96 @@ class ExecutionStore:
             )
             return True
 
+    def bilibili_hello(self, original, message):
+        from upload_platform.adapters.bilibili.protocol import verify_identity
+
+        with self.database.transaction() as conn:
+            _, attempt = self.owned(conn, original)
+            verify_identity(message, attempt)
+            if message.type != "hello" or attempt["handed_off_at"] is not None:
+                raise Problem("invalid_handshake", "引擎握手阶段无效", 409)
+            conn.execute(
+                update(db.attempts)
+                .where(db.attempts.c.id == attempt["id"])
+                .values(execution={**attempt["execution"], "hello_received": True})
+            )
+
+    def handoff(self, original):
+        from upload_platform.adapters.bilibili.b18 import B18Allowlist, denied
+
+        with self.database.transaction() as conn:
+            task, attempt = self.owned(conn, original)
+            if task["cancel_requested_at"] is not None:
+                return False
+            permit = B18Allowlist.load(self.config)
+            if permit:
+                permit.check_task(task, executing=True)
+                if attempt["attempt_number"] != 1:
+                    raise denied("本轮 B18 仅允许首次执行")
+                if task["snapshot"]["mode"] == "multipart":
+                    permit.check_handoff(conn, task)
+            elif "b18_run_id" in task["snapshot"]:
+                raise denied("当前 Worker 未配置本轮 B18 清单")
+            if (
+                not attempt["execution"].get("hello_received")
+                or attempt["handed_off_at"] is not None
+            ):
+                raise Problem("invalid_handshake", "引擎未完成握手或任务已经交接", 409)
+            at = self.clock()
+            task_state(conn, task, "RUNNING", at)
+            transition(attempt["status"], "RUNNING", attempt=True)
+            conn.execute(
+                update(db.attempts)
+                .where(db.attempts.c.id == attempt["id"])
+                .values(status="RUNNING", phase="handed_off", handed_off_at=at)
+            )
+            db.add_event(
+                conn,
+                task["id"],
+                "attempt.handed_off",
+                task_id=task["id"],
+                attempt_id=attempt["id"],
+                at=at,
+            )
+            return True
+
+    def bilibili_event(self, original, message):
+        from upload_platform.adapters.bilibili.protocol import verify_identity
+
+        with self.database.transaction() as conn:
+            task, attempt = self.owned(conn, original)
+            verify_identity(message, attempt)
+            if attempt["handed_off_at"] is None or message.type != "progress":
+                raise Problem("host_phase", "未交接执行不能报告进度", 409)
+            observed = dict(attempt["execution"].get("observed_events", {}))
+            key = str(message.sequence)
+            value = message.model_dump()
+            if key in observed:
+                if observed[key] != value:
+                    raise Problem("host_sequence", "同序号事件内容冲突", 409)
+                return
+            if message.sequence <= attempt["host_sequence"]:
+                raise Problem("host_sequence", "阶段事件序号倒退", 409)
+            observed[key] = value
+            conn.execute(
+                update(db.attempts)
+                .where(db.attempts.c.id == attempt["id"])
+                .values(
+                    host_sequence=message.sequence,
+                    phase=message.phase,
+                    execution={**attempt["execution"], "observed_events": observed},
+                )
+            )
+            db.add_event(
+                conn,
+                task["id"],
+                "engine.progress",
+                {"sequence": message.sequence, "phase": message.phase},
+                task_id=task["id"],
+                attempt_id=attempt["id"],
+                at=self.clock(),
+            )
+
     def recovery_claim(self):
         with self.database.transaction() as conn:
             at = self.clock()
@@ -381,20 +486,40 @@ class ExecutionStore:
         with self.database.transaction() as conn:
             at = self.clock()
             task, attempt = self.owned(conn, original, recovery)
-            if result is not None:
-                from upload_platform.execution.protocol import HostResult, verify_identity
-
-                parsed = HostResult.model_validate(result)
-                verify_identity(parsed, attempt)
-                if (
-                    attempt["permission_at"] is None
-                    or parsed.host_sequence < attempt["host_sequence"]
+            bilibili = task["snapshot"]["target"]["platform"] == "bilibili"
+            authorized = attempt["handed_off_at"] if bilibili else attempt["permission_at"]
+            if bilibili:
+                if attempt["execution"] and not attempt["exit_confirmed"]:
+                    raise Problem("exit_unconfirmed", "必须独立确认引擎进程树退出", 409)
+                if authorized is not None and (
+                    outcome == "cancelled"
+                    or (result is None and outcome in ("retryable", "permanent", "succeeded"))
                 ):
-                    raise Problem("invalid_result", "结果缺少有效许可或已过时", 409)
+                    raise Problem("unsafe_outcome", "已交接执行缺少安全收尾证据", 409)
+            if result is not None:
+                if bilibili:
+                    from upload_platform.adapters.bilibili.protocol import verify_result
+
+                    parsed = verify_result(result, attempt)
+                else:
+                    from upload_platform.execution.protocol import HostResult, verify_identity
+
+                    parsed = HostResult.model_validate(result)
+                    verify_identity(parsed, attempt)
+                    if authorized is None or parsed.host_sequence < attempt["host_sequence"]:
+                        raise Problem("invalid_result", "结果缺少有效许可或已过时", 409)
                 if parsed.outcome != outcome:
                     raise Problem("invalid_result", "结果不能被改写为其他结论", 409)
+            if (
+                bilibili
+                and result
+                and (result.get("error") or {}).get("code") == "CREDENTIAL_INVALID"
+            ):
+                from upload_platform.application.accounts import schedule_renewal
+
+                schedule_renewal(conn, task["account_id"], attempt["execution"], at)
             if outcome == "succeeded":
-                if result is None or attempt["permission_at"] is None:
+                if result is None or authorized is None:
                     raise Problem("invalid_success", "成功缺少许可与结果证据", 409)
                 state, attempt_state = "SUCCEEDED", "SUCCEEDED"
                 conn.execute(
@@ -403,8 +528,10 @@ class ExecutionStore:
                         task_id=task["id"],
                         attempt_id=attempt["id"],
                         source="adapter",
-                        fake=True,
+                        fake=not bilibili,
                         evidence=result["receipt"],
+                        review_status=result["receipt"].get("review_status") if bilibili else None,
+                        last_query_at=result["receipt"].get("queried_at") if bilibili else None,
                     )
                 )
             elif outcome == "retryable":

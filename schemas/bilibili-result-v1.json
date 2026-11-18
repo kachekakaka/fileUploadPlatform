@@ -1,0 +1,356 @@
+{
+  "$defs": {
+    "EngineError": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "pattern": "^[A-Z][A-Z0-9_]{0,63}$",
+          "title": "Code",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "title": "EngineError",
+      "type": "object"
+    },
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": 1,
+          "title": "Protocol Version",
+          "type": "integer"
+        },
+        "platform": {
+          "const": "bilibili",
+          "title": "Platform",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "execution_id": {
+          "title": "Execution Id",
+          "type": "string"
+        },
+        "generation": {
+          "minimum": 1,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "expected_mid": {
+          "pattern": "^[1-9][0-9]*$",
+          "title": "Expected Mid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "platform",
+        "task_id",
+        "attempt_id",
+        "execution_id",
+        "generation",
+        "expected_mid"
+      ],
+      "title": "Identity",
+      "type": "object"
+    },
+    "Message": {
+      "additionalProperties": false,
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/Identity"
+        },
+        "engine_build_id": {
+          "title": "Engine Build Id",
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "hello",
+            "progress",
+            "result"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "sequence": {
+          "minimum": 0,
+          "title": "Sequence",
+          "type": "integer"
+        },
+        "phase": {
+          "anyOf": [
+            {
+              "enum": [
+                "request_accepted",
+                "uploading",
+                "waiting_submit",
+                "submit_intent",
+                "submit_response",
+                "finished"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Phase"
+        },
+        "at": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At"
+        },
+        "verified_mid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Verified Mid"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Details"
+        },
+        "result_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result Path"
+        }
+      },
+      "required": [
+        "identity",
+        "engine_build_id",
+        "type",
+        "sequence"
+      ],
+      "title": "Message",
+      "type": "object"
+    },
+    "Receipt": {
+      "additionalProperties": false,
+      "properties": {
+        "platform": {
+          "const": "bilibili",
+          "title": "Platform",
+          "type": "string"
+        },
+        "verified_mid": {
+          "title": "Verified Mid",
+          "type": "string"
+        },
+        "aid": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aid"
+        },
+        "bvid": {
+          "anyOf": [
+            {
+              "pattern": "^BV[A-Za-z0-9]{10}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bvid"
+        },
+        "video_keys": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Video Keys",
+          "type": "array"
+        },
+        "submit_api": {
+          "const": "web",
+          "title": "Submit Api",
+          "type": "string"
+        },
+        "submit_code": {
+          "const": 0,
+          "title": "Submit Code",
+          "type": "integer"
+        },
+        "query_verified": {
+          "const": true,
+          "title": "Query Verified",
+          "type": "boolean"
+        },
+        "queried_at": {
+          "title": "Queried At",
+          "type": "number"
+        },
+        "review_status": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Review Status"
+        }
+      },
+      "required": [
+        "platform",
+        "verified_mid",
+        "video_keys",
+        "submit_api",
+        "submit_code",
+        "query_verified",
+        "queried_at",
+        "review_status"
+      ],
+      "title": "Receipt",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "identity": {
+      "$ref": "#/$defs/Identity"
+    },
+    "engine_build_id": {
+      "title": "Engine Build Id",
+      "type": "string"
+    },
+    "type": {
+      "const": "result",
+      "title": "Type",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 3,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "verified_mid": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Verified Mid"
+    },
+    "outcome": {
+      "enum": [
+        "succeeded",
+        "retryable",
+        "permanent",
+        "uncertain"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "submission_state": {
+      "enum": [
+        "accepted",
+        "not_submitted",
+        "unknown"
+      ],
+      "title": "Submission State",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/EngineError"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "receipt": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Receipt"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "history": {
+      "items": {
+        "$ref": "#/$defs/Message"
+      },
+      "maxItems": 1000,
+      "minItems": 2,
+      "title": "History",
+      "type": "array"
+    }
+  },
+  "required": [
+    "identity",
+    "engine_build_id",
+    "type",
+    "sequence",
+    "verified_mid",
+    "outcome",
+    "submission_state",
+    "error",
+    "receipt",
+    "history"
+  ],
+  "title": "Result",
+  "type": "object"
+}

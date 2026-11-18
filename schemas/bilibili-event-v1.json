@@ -1,0 +1,153 @@
+{
+  "$defs": {
+    "Identity": {
+      "additionalProperties": false,
+      "properties": {
+        "protocol_version": {
+          "const": 1,
+          "title": "Protocol Version",
+          "type": "integer"
+        },
+        "platform": {
+          "const": "bilibili",
+          "title": "Platform",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        },
+        "attempt_id": {
+          "title": "Attempt Id",
+          "type": "string"
+        },
+        "execution_id": {
+          "title": "Execution Id",
+          "type": "string"
+        },
+        "generation": {
+          "minimum": 1,
+          "title": "Generation",
+          "type": "integer"
+        },
+        "expected_mid": {
+          "pattern": "^[1-9][0-9]*$",
+          "title": "Expected Mid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "protocol_version",
+        "platform",
+        "task_id",
+        "attempt_id",
+        "execution_id",
+        "generation",
+        "expected_mid"
+      ],
+      "title": "Identity",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "identity": {
+      "$ref": "#/$defs/Identity"
+    },
+    "engine_build_id": {
+      "title": "Engine Build Id",
+      "type": "string"
+    },
+    "type": {
+      "enum": [
+        "hello",
+        "progress",
+        "result"
+      ],
+      "title": "Type",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "phase": {
+      "anyOf": [
+        {
+          "enum": [
+            "request_accepted",
+            "uploading",
+            "waiting_submit",
+            "submit_intent",
+            "submit_response",
+            "finished"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Phase"
+    },
+    "at": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "At"
+    },
+    "verified_mid": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Verified Mid"
+    },
+    "details": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Details"
+    },
+    "result_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Result Path"
+    }
+  },
+  "required": [
+    "identity",
+    "engine_build_id",
+    "type",
+    "sequence"
+  ],
+  "title": "Message",
+  "type": "object"
+}

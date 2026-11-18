@@ -87,6 +87,7 @@ def test_only_approved_account_files_and_metadata(setup, tmp_path):
         (("upload_units", 0, "targets", 0, "account"), "bilibili:43"),
         (("upload_units", 0, "targets", 0, "options", "publish_mode"), "self_only"),
         (("upload_units", 0, "targets", 0, "options", "category_id"), 1),
+        (("upload_units", 0, "targets", 0, "options", "hide_in_space"), True),
         (
             ("upload_units", 0, "targets", 0, "options"),
             {"category_id": 171, "copyright": 2, "source": "other", "publish_mode": "public"},
@@ -119,6 +120,60 @@ def test_only_approved_account_files_and_metadata(setup, tmp_path):
         service.submit(work["work_id"], uid(), Submission(retry_policy=ONCE))
     with service.database.read() as conn:
         assert not db.many(conn, select(db.tasks))
+
+
+def test_hide_in_space_cannot_use_an_engine_without_the_option(setup, tmp_path):
+    service, permit = setup
+    work = permit["multi"]
+    work["options"]["hide_in_space"] = True
+    write_json(tmp_path / "allowlist.json", permit)
+    manifest = read_manifest(work["directory"])
+    manifest["upload_units"][0]["targets"][0]["options"]["hide_in_space"] = True
+    request = Registration(directory=work["directory"], manifest=manifest)
+    with pytest.raises(Problem, match="不支持在个人空间"):
+        service.registration(uid(), request)
+    caps = tmp_path / "capabilities.json"
+    write_json(caps, json.loads(caps.read_text()) | {"supports_hide_in_space": True})
+    service.registration(uid(), request)
+
+
+def test_self_only_trial_allows_one_private_single_with_supported_engine(setup, tmp_path):
+    service, permit = setup
+    multi = permit.pop("multi")
+    work = permit["single"]
+    permit["self_only_trial"] = True
+    work["options"]["publish_mode"] = "self_only"
+    write_json(tmp_path / "allowlist.json", permit)
+    manifest = read_manifest(work["directory"])
+    options = manifest["upload_units"][0]["targets"][0]["options"]
+    options["publish_mode"] = "self_only"
+    save_manifest(Path(work["directory"]), manifest)
+
+    with pytest.raises(Problem, match="不支持仅自己可见"):
+        register(service, work)
+    caps = tmp_path / "capabilities.json"
+    write_json(caps, json.loads(caps.read_text()) | {"supports_self_only": True})
+    with pytest.raises(Problem, match="私密单 P"):
+        register(service, multi)
+    public_manifest = deepcopy(manifest)
+    public_manifest["upload_units"][0]["targets"][0]["options"]["publish_mode"] = "public"
+    with pytest.raises(Problem, match="与 B18 清单不符"):
+        service.registration(
+            uid(), Registration(directory=work["directory"], manifest=public_manifest)
+        )
+    register(service, work)
+    request = Submission(retry_policy=ONCE)
+    first = service.submit(work["work_id"], uid(), request)[1]["tasks"][0]
+    repeated = service.submit(work["work_id"], uid(), request)[1]["tasks"][0]
+    assert repeated["task_id"] == first["task_id"] and not repeated["created"]
+    store = ExecutionStore(service.database)
+    store.register()
+    attempt = store.claim()
+    Supervisor(store).execute(attempt)
+    assert service.task(first["task_id"])["status"] == "SUCCEEDED"
+    evidence = tmp_path / "data" / "executions" / attempt["id"] / "fixture-received.json"
+    assert json.loads(evidence.read_text())["request"]["options"]["publish_mode"] == "self_only"
+    assert store.claim() is None
 
 
 def test_concurrent_requests_restart_and_used_quota(setup, tmp_path):

@@ -14,6 +14,16 @@ def validate_item(item, deployment, *, b18=None):
         or options["publish_mode"] not in capabilities.get("verified_publish_modes", [])
     ):
         raise Problem("UNSUPPORTED_OPTION", "该构建尚未声明经验证的发布方式", 409)
+    if (
+        options.get("hide_in_space", False)
+        and capabilities.get("supports_hide_in_space") is not True
+    ):
+        raise Problem("UNSUPPORTED_OPTION", "该构建不支持在个人空间-投稿中隐藏", 409)
+    if (
+        options["publish_mode"] == "self_only"
+        and capabilities.get("supports_self_only") is not True
+    ):
+        raise Problem("UNSUPPORTED_OPTION", "该构建不支持仅自己可见", 409)
     if any(p["subtitles"] for p in item["parts"]):
         raise Problem("UNSUPPORTED_OPTION", "Bilibili 首版不支持目标引用字幕")
     limits = capabilities.get("metadata_limits", {})

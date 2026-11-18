@@ -73,8 +73,9 @@ class B18Allowlist(StrictModel):
     engine_build_id: str = Field(min_length=1)
     mid: str = Field(pattern=r"^[1-9][0-9]*$")
     single: ApprovedWork
-    multi: ApprovedWork
+    multi: ApprovedWork | None = None
     supplement: B18Supplement | None = None
+    self_only_trial: bool = False
 
     _root = field_validator("core_data_dir")(lexical_root)
 
@@ -84,7 +85,18 @@ class B18Allowlist(StrictModel):
         return str(UUID(value))
 
     @model_validator(mode="after")
-    def two_works(self):
+    def approved_works(self):
+        if self.self_only_trial:
+            if (
+                self.multi is not None
+                or self.supplement is not None
+                or self.single.options.publish_mode != "self_only"
+                or len(self.single.parts) != 1
+            ):
+                raise ValueError("仅自己可见验收只允许一份私密单 P")
+            return self
+        if self.multi is None:
+            raise ValueError("公开试投须同时指定单 P 和多 P")
         if (
             self.single.work_id == self.multi.work_id
             or self.single.directory == self.multi.directory
@@ -118,7 +130,8 @@ class B18Allowlist(StrictModel):
         if permit.core_data_dir != data_dir or permit.engine_build_id != engine.build_id:
             raise denied("B18 清单与当前 Core 数据目录或引擎构建不符")
         if any(
-            permit_path.is_relative_to(work.directory) for work in (permit.single, permit.multi)
+            work is not None and permit_path.is_relative_to(work.directory)
+            for work in (permit.single, permit.multi)
         ):
             raise denied("B18 清单必须保存在作品目录之外")
         return permit
@@ -130,7 +143,10 @@ class B18Allowlist(StrictModel):
         if target["platform"] != "bilibili" or target["expected_mid"] != self.mid:
             raise denied("仅允许清单指定的 Bilibili 账号")
         approved = self.single if item["mode"] == "independent" else self.multi
+        if approved is None:
+            raise denied("本轮只开放指定的私密单 P")
         fields = posting_fields(item, paths)
+        fields["options"] = {"hide_in_space": False, **fields["options"]}
         for part, reference in zip(fields["parts"], item["parts"], strict=True):
             part["video_id"] = reference["video_id"]
         actual = dict(

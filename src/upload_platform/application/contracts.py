@@ -103,6 +103,7 @@ class BilibiliOptions(StrictModel):
     copyright: Literal[1, 2]
     source: str = ""
     publish_mode: Literal["public", "self_only"]
+    hide_in_space: bool = False
 
     @field_validator("copyright", mode="before")
     @classmethod
@@ -195,6 +196,10 @@ class Manifest(StrictModel):
             result["work"].setdefault(field, default)
         for unit, value in zip(self.upload_units, result["upload_units"]):
             value["metadata_overrides"] = unit.metadata_overrides.model_dump(exclude_unset=True)
+            for target in value["targets"]:
+                if target["platform"] == "bilibili" and not target["options"]["hide_in_space"]:
+                    # Omission and false keep the same legacy manifest and request replay key.
+                    target["options"].pop("hide_in_space")
         for video, value in zip(self.assets.videos, result["assets"]["videos"]):
             value["metadata"] = video.metadata.model_dump(exclude_unset=True)
         return result

@@ -24,13 +24,22 @@ from upload_platform.infrastructure.database import Database
 from upload_platform.infrastructure.windows import JobHost
 
 
-@pytest.mark.parametrize("second_part_failure", [False, True], ids=["accepted", "p2-complete"])
+@pytest.mark.parametrize(
+    "second_part_failure, hide, mode",
+    [
+        (False, False, "public"),
+        (False, True, "public"),
+        (True, False, "public"),
+        (False, False, "self_only"),
+    ],
+    ids=["accepted", "space-hidden", "p2-complete", "self-only"],
+)
 @pytest.mark.skipif(
     not os.getenv("BUE_TEST_EXECUTABLE") or not os.getenv("BUE_HTTP_TEST_MODULE"),
     reason="requires separately built fixture Rust engine and its HTTP fixture module",
 )
 def test_real_core_and_rust_login_upload_query_contract(
-    config, tmp_path, work_factory, monkeypatch, second_part_failure
+    config, tmp_path, work_factory, monkeypatch, second_part_failure, hide, mode
 ):
     executable = Path(os.environ["BUE_TEST_EXECUTABLE"])
     capabilities = json.loads(subprocess.check_output([str(executable), "capabilities"], text=True))
@@ -104,11 +113,22 @@ def test_real_core_and_rust_login_upload_query_contract(
             {
                 "platform": "bilibili",
                 "account": "bilibili:42",
-                "options": {"category_id": 171, "copyright": 1, "publish_mode": "public"},
+                "options": {"category_id": 171, "copyright": 1, "publish_mode": mode},
             }
         ]
+        options = manifest["upload_units"][0]["targets"][0]["options"]
+        options["hide_in_space"] = hide
         save_manifest(directory, manifest)
-        service.registration(uid(), Registration(directory=str(directory), manifest=manifest))
+        key = uid()
+        registration = service.registration(
+            key, Registration(directory=str(directory), manifest=manifest)
+        )
+        if not hide:
+            options.pop("hide_in_space")
+            assert (
+                service.registration(key, Registration(directory=str(directory), manifest=manifest))
+                == registration
+            )
         submission = Submission(retry_policy=RetryPolicy(max_attempts=1, retry_delays_seconds=[]))
         task_id = service.submit(manifest["work"]["id"], uid(), submission)[1]["tasks"][0][
             "task_id"
@@ -139,6 +159,10 @@ def test_real_core_and_rust_login_upload_query_contract(
         server[1]["review_state"] = -4
         assert RemoteQueries(service).query(task_id, uid())[1]["result"]["review_status"] == -4
         assert len(server[1]["submissions"]) == 1
+        [posted] = server[1]["submissions"]
+        assert posted["space_hidden"] == (1 if hide else 2)
+        assert posted["is_only_self"] == (1 if mode == "self_only" else 0)
+        assert task["snapshot"]["target"]["options"].get("hide_in_space", False) is hide
         assert server[2] not in json.dumps(service.task(task_id))
     finally:
         database.close()

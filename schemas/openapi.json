@@ -4668,6 +4668,11 @@
               "self_only"
             ],
             "title": "Publish Mode"
+          },
+          "hide_in_space": {
+            "type": "boolean",
+            "title": "Hide In Space",
+            "default": false
           }
         },
         "additionalProperties": false,

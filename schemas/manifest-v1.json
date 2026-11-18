@@ -78,6 +78,11 @@
           ],
           "title": "Publish Mode",
           "type": "string"
+        },
+        "hide_in_space": {
+          "default": false,
+          "title": "Hide In Space",
+          "type": "boolean"
         }
       },
       "required": [

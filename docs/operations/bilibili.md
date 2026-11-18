@@ -89,9 +89,13 @@ Core 重启后通过原操作恢复已发布的凭据版本。旧进程身份不
 
 经明确授权可在原清单中加 `supplement` 对象，填入 `single_task_id`、`failed_task_id` 和 `failed_attempt_id`，并绑定本次编译的引擎版本。该入口核对原多 P 的 `VIDEO_UPLOAD_FAILED` 明确未投稿证据和原单 P 的独立回查，再用 `upload-platform task reupload <failed-task-id> --max-attempts 1` 创建唯一后继任务。请求响应丢失时沿用原请求编号恢复。两项原名额和历史继续保留。现场前提及验证见[多 P 补测](../方案/20261116-Bilibili集成与自维护方案-v1.2.md#2310-b18-多-p-补测)。
 
+私密试投用独立清单，设置 `self_only_trial: true`，只填写一份 `single`，其中 `publish_mode` 为 `self_only`。引擎须声明 `supports_self_only`。使用 `--max-attempts 1` 手动提交，按同一稿件号回查创作中心、投稿账号播放和未登录访问，然后撤下清单。[私密试投验收](../../archive/方案/20261119-B18仅自己可见验收.md)
+
 ## 投稿配置与查询
 
 Target 必须显式选择 `platform: bilibili`、`account: bilibili:<MID>`，以及 `category_id`、`copyright`、`publish_mode`。`copyright=2` 要求非空 `source`，自制稿的来源留空。Core 会拒绝字幕引用、未知选项、超限标题及标签。普通投稿只开放经真实验收的发布方式。执行前还会按账号查询分区能力。
+
+通过 `upload.yaml` 或 API 在 Bilibili Target 的 `options` 填 `hide_in_space: true`，表示在个人空间的投稿列表中隐藏。默认关闭，`publish_mode` 仍需单独填写。引擎能力须声明 `supports_hide_in_space` 才能开启。[本地验证和真实平台待验项](../方案/20261116-Bilibili集成与自维护方案-v1.2.md#2312-个人空间投稿列表隐藏)
 
 本地只引用文件；引擎打开实际句柄后校验最终路径，按快照顺序上传，不 glob、不复制、删除或扫描媒体内容。单视频分片并发为 1，同 MID 最多三个 Task，最终投稿持账号 OS 锁串行。Core 不给 Bilibili 上传或等锁设置总时限。
 

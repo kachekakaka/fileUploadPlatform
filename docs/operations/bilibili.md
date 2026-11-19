@@ -1,6 +1,6 @@
 # Bilibili 本机运行与验收
 
-mumu 本机账号页已通过真实扫码登录验收。当前构建也已实现只读验证、显式续期、账号启停、一次交接上传和主动稿件查询。正式引擎报告 `upload_ready=false`、`verified_publish_modes=[]`，Core 据此拒绝普通投稿。能力文件须保留引擎的原始输出。指定账号的公开试稿结果另见验收记录。[扫码验收记录](../方案/20261117-mumu界面扫码登录接入方案.md#14-本机真实扫码验收) · [B18 公开试投记录](../方案/20261116-Bilibili集成与自维护方案-v1.2.md#238-b18-公开试投记录)
+mumu 本机账号页已通过真实扫码登录验收。当前构建支持只读验证、显式续期、账号启停、一次交接上传和主动稿件查询。当前项目的本机普通入口已开放单 P 和多 P 的公开、仅自己可见和空间列表隐藏设置。[普通入口开启记录](../方案/20261116-Bilibili集成与自维护方案-v1.2.md#普通投稿开放私密和空间列表隐藏) · [扫码验收记录](../方案/20261117-mumu界面扫码登录接入方案.md#14-本机真实扫码验收)
 
 ## 部署边界
 
@@ -12,12 +12,16 @@ mumu 本机账号页已通过真实扫码登录验收。当前构建也已实现
 
 ```json
 {
-  "executable": "D:/runtime/engines/bue-0.2.0-dev1/bilibili-upload-engine.exe",
-  "build_id": "bue-0.2.0-dev1",
+  "executable": "D:/runtime/engines/bue-0.2.0-dev6/bilibili-upload-engine.exe",
+  "build_id": "bue-0.2.0-dev6",
   "state_root": "D:/runtime/bilibili-private",
-  "capabilities_file": "D:/runtime/engines/bue-0.2.0-dev1/capabilities.json"
+  "capabilities_file": "D:/runtime/engines/bue-0.2.0-dev6/capabilities.json",
+  "allow_self_only": true,
+  "allow_hide_in_space": true
 }
 ```
+
+`allow_self_only` 和 `allow_hide_in_space` 分别让本机普通入口接受引擎支持的私密和空间列表隐藏选项。省略时沿用引擎的已验证声明。Server 和 Worker 都应读取同一份配置，变更后重启相关进程。能力文件保留引擎原始输出。
 
 私有状态根必须在 Core 数据目录外，所有本机 Worker/维护入口共用同一根。引擎创建限制为 Owner Rights、SYSTEM、Administrators 的 Windows ACL；凭据按 MID 与操作 UUID 发布为独立版本，旧版本保留。Core 只保存版本引用，不读取、复制或记录 Cookie。备份必须包含数据库、维护结果与其引用的凭据版本；不要只复制单个新凭据后删除旧版。暂不提供自动凭据清理。
 
@@ -95,9 +99,9 @@ Core 重启后通过原操作恢复已发布的凭据版本。旧进程身份不
 
 ## 投稿配置与查询
 
-Target 必须显式选择 `platform: bilibili`、`account: bilibili:<MID>`，以及 `category_id`、`copyright`、`publish_mode`。`copyright=2` 要求非空 `source`，自制稿的来源留空。Core 会拒绝字幕引用、未知选项、超限标题及标签。普通投稿只开放经真实验收的发布方式。执行前还会按账号查询分区能力。
+Target 必须显式选择 `platform: bilibili`、`account: bilibili:<MID>`，以及 `category_id`、`copyright`、`publish_mode`。`copyright=2` 要求非空 `source`，自制稿的来源留空。Core 会拒绝字幕引用、未知选项、超限标题及标签。公开选 `publish_mode: public`，仅自己可见选 `publish_mode: self_only`。两种方式均适用于单 P 和多 P。执行前按账号查询分区能力。
 
-通过 `upload.yaml` 或 API 在 Bilibili Target 的 `options` 填 `hide_in_space: true`，表示在个人空间的投稿列表中隐藏。默认关闭，`publish_mode` 仍需单独填写。引擎能力须声明 `supports_hide_in_space` 才能开启。[本地验证和真实平台待验项](../方案/20261116-Bilibili集成与自维护方案-v1.2.md#2312-个人空间投稿列表隐藏)
+通过 `upload.yaml` 或 API 在 Bilibili Target 的 `options` 填 `hide_in_space: true`，表示在个人空间的投稿列表中隐藏，默认关闭。它与 `publish_mode` 独立。选择公开并开启隐藏时，稿件仍按公开范围发布，通过直链仍可访问。引擎须支持所选项，普通入口同时依据部署的放行配置和引擎的已验证声明判断。[本机设置与验证范围](../方案/20261116-Bilibili集成与自维护方案-v1.2.md#普通投稿开放私密和空间列表隐藏)
 
 本地只引用文件；引擎打开实际句柄后校验最终路径，按快照顺序上传，不 glob、不复制、删除或扫描媒体内容。单视频分片并发为 1，同 MID 最多三个 Task，最终投稿持账号 OS 锁串行。Core 不给 Bilibili 上传或等锁设置总时限。
 

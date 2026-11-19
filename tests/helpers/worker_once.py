@@ -1,6 +1,7 @@
 """Real crash injector, executed only by recovery tests in a separate process."""
 
 import inspect
+import json
 import os
 import sys
 import time
@@ -11,7 +12,7 @@ from upload_platform.execution.leases import ExecutionStore
 from upload_platform.execution.runtime import Supervisor
 from upload_platform.infrastructure.database import Database
 from upload_platform.infrastructure.files import write_json
-from upload_platform.infrastructure.windows import process_creation
+from upload_platform.infrastructure.windows import JobHost, process_creation
 
 
 def main():
@@ -43,6 +44,19 @@ def main():
                 time.sleep(0.01)
         os._exit(91)
 
+    if point in ("during_bilibili_send", "after_bilibili_send"):
+        send = JobHost.send
+
+        def send_and_crash(host, request):
+            if point == "during_bilibili_send":
+                message = json.dumps(request)
+                host.stdin.write(message[: len(message) // 2])
+                host.stdin.flush()
+            else:
+                send(host, request)
+            crash(point)
+
+        JobHost.send = send_and_crash
     Supervisor(store, crash).execute(attempt)
 
 

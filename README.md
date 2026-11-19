@@ -2,7 +2,7 @@
 
 目标是独立运行的上传应用，提供 REST API、Python SDK、CLI 和 Web Dashboard，首批支持 Bilibili 与百度网盘。
 
-当前已实现 Windows 本机 Core MVP：作品描述与文件引用、REST API、HTTP CLI、独立 Worker、受监督的 Fake Adapter、立即/一次性/每日/每周任务、请求重放与执行恢复。原实施结果见 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)，后续边界修复与补验见[审查修复结果](archive/方案/20261116-Core-MVP审查修复.md#实际结果)。Bilibili 已通过真实扫码和 B18 受控试投，普通投稿入口仍待发版验收。Fake 回执仍仅为模拟；百度网盘、SDK、Dashboard、网页文件接收和 Cron 尚未实现。[Bilibili 发版验收对照](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#2314-发版前验收对照2026-11-19) · [Bilibili 操作说明](docs/operations/bilibili.md)
+当前已实现 Windows 本机 Core MVP：作品描述与文件引用、REST API、HTTP CLI、独立 Worker、受监督的 Fake Adapter、立即/一次性/每日/每周任务、请求重放与执行恢复。原实施结果见 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)，后续边界修复与补验见[审查修复结果](archive/方案/20261116-Core-MVP审查修复.md#实际结果)。Bilibili 普通入口支持单 P 和多 P 的公开、仅自己可见和空间列表隐藏设置。Fake 回执仍仅为模拟；百度网盘、SDK、Dashboard、网页文件接收和 Cron 尚未实现。[Bilibili 普通入口开启记录](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#普通投稿开放私密和空间列表隐藏) · [Bilibili 操作说明](docs/operations/bilibili.md)
 
 ## 按任务查阅
 

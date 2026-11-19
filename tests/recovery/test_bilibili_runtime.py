@@ -11,12 +11,14 @@ from sqlalchemy import insert, select
 
 from conftest import save_manifest
 from upload_platform.adapters.bilibili.config import EngineConfig
+from upload_platform.application.accounts import Accounts, MaintenanceRequest
 from upload_platform.application.contracts import Registration, Submission, Empty
 from upload_platform.application.service import Service
 from upload_platform.domain.core import Problem, uid
 from upload_platform.execution.leases import ExecutionStore
 from upload_platform.execution.runtime import Supervisor
 from upload_platform.infrastructure import database as db
+from test_process_crashes import wait_until
 
 
 @pytest.fixture
@@ -193,10 +195,7 @@ def test_stderr_is_drained_without_storing_secret_or_blocking_engine(setup_bilib
     assert len(log) < 256 and b"SYNTHETIC_COOKIE" not in log
 
 
-def test_multiworker_same_mid_has_three_slots_and_other_mid_is_independent(
-    setup_bilibili, work_factory
-):
-    database, service, _, _, _ = setup_bilibili
+def register_other_bilibili_account(database):
     with database.transaction() as conn:
         conn.execute(
             insert(db.accounts).values(
@@ -210,20 +209,31 @@ def test_multiworker_same_mid_has_three_slots_and_other_mid_is_independent(
                 credential_reference="43-00000000-0000-0000-0000-000000000001.json",
             )
         )
+
+
+def queue_bilibili_work(service, work_factory, mid):
+    directory, manifest = work_factory()
+    for video in manifest["assets"]["videos"]:
+        video.pop("subtitles", None)
+    manifest["upload_units"][0]["targets"] = [
+        {
+            "platform": "bilibili",
+            "account": "bilibili:" + mid,
+            "options": {"category_id": 171, "copyright": 1, "publish_mode": "public"},
+        }
+    ]
+    save_manifest(directory, manifest)
+    service.registration(uid(), Registration(directory=str(directory), manifest=manifest))
+    service.submit(manifest["work"]["id"], uid(), Submission())
+
+
+def test_multiworker_same_mid_has_three_slots_and_other_mid_is_independent(
+    setup_bilibili, work_factory
+):
+    database, service, _, _, _ = setup_bilibili
+    register_other_bilibili_account(database)
     for mid in ("42", "42", "42", "43"):
-        directory, manifest = work_factory()
-        for video in manifest["assets"]["videos"]:
-            video.pop("subtitles", None)
-        manifest["upload_units"][0]["targets"] = [
-            {
-                "platform": "bilibili",
-                "account": "bilibili:" + mid,
-                "options": {"category_id": 171, "copyright": 1, "publish_mode": "public"},
-            }
-        ]
-        save_manifest(directory, manifest)
-        service.registration(uid(), Registration(directory=str(directory), manifest=manifest))
-        service.submit(manifest["work"]["id"], uid(), Submission())
+        queue_bilibili_work(service, work_factory, mid)
     workers = [ExecutionStore(database) for _ in range(6)]
     for worker in workers:
         worker.register()
@@ -235,3 +245,52 @@ def test_multiworker_same_mid_has_three_slots_and_other_mid_is_independent(
     ]
     assert mids.count("42") == 3 and mids.count("43") == 1
     assert all(worker.claim() is None for worker in workers)
+
+
+def test_maintenance_waits_for_three_active_uploads_without_blocking_other_mid(
+    setup_bilibili, work_factory, tmp_path
+):
+    database, service, _, first_task, control = setup_bilibili
+    register_other_bilibili_account(database)
+    for mid in ("42", "42", "42", "43"):
+        queue_bilibili_work(service, work_factory, mid)
+    workers = [ExecutionStore(database) for _ in range(4)]
+    for worker in workers:
+        worker.register()
+    active = [worker.claim() for worker in workers[:3]]
+    assert all(
+        service.task(attempt["task_id"])["snapshot"]["target"]["expected_mid"] == "42"
+        for attempt in active
+    )
+    gate = tmp_path / "finish-uploads"
+    control.write_text(json.dumps({"gate": str(gate)}))
+    accounts = Accounts(service)
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        uploads = [
+            pool.submit(Supervisor(worker).execute, attempt)
+            for worker, attempt in zip(workers, active)
+        ]
+        try:
+            root = database.config.data_dir / "executions"
+            wait_until(
+                lambda: all(
+                    (root / attempt["id"] / "fixture-received.json").is_file() for attempt in active
+                )
+            )
+            account_id = service.task(first_task)["account_id"]
+            maintenance = accounts.create(uid(), MaintenanceRequest(account_id=account_id))[1]
+            assert set(maintenance["execution"]["waiting_attempts"]) == {
+                attempt["id"] for attempt in active
+            }
+            with pytest.raises(Problem, match="正在等待"):
+                accounts.start(maintenance["id"], uid())
+            other = workers[3].claim()
+            assert service.task(other["task_id"])["snapshot"]["target"]["expected_mid"] == "43"
+            assert all(not future.done() for future in uploads)
+            assert workers[3].claim() is None
+        finally:
+            gate.touch()
+        for upload in uploads:
+            upload.result(timeout=15)
+    assert all(service.task(attempt["task_id"])["status"] == "SUCCEEDED" for attempt in active)
+    assert accounts.start(maintenance["id"], uid())[1]["engine_request"]["expected_mid"] == "42"

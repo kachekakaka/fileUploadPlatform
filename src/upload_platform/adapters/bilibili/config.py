@@ -14,6 +14,8 @@ class EngineConfig:
     allow_test_engine: bool = False
     test_arguments: tuple[str, ...] = ()
     b18_allowlist_file: Path | None = None
+    allow_self_only: bool = False
+    allow_hide_in_space: bool = False
 
     def __post_init__(self):
         if not all(
@@ -29,6 +31,8 @@ class EngineConfig:
             raise Problem("configuration", "引擎构建标识或测试配置无效")
         if self.build_id.endswith("-fixture") and not self.allow_test_engine:
             raise Problem("configuration", "测试引擎不能用于普通运行环境")
+        if type(self.allow_self_only) is not bool or type(self.allow_hide_in_space) is not bool:
+            raise Problem("configuration", "私密和空间列表隐藏的放行项必须是布尔值")
         if self.test_arguments and (
             not self.allow_test_engine or not self.build_id.endswith("-fixture")
         ):

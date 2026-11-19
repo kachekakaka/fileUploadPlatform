@@ -23,6 +23,8 @@ from test_process_crashes import env_for, wait_until, cleanup_test_launch
         ("after_assign", "RECOVERY_PENDING"),
         ("after_identity", "RETRY_WAIT"),
         ("after_handoff", "UNCERTAIN"),
+        ("during_bilibili_send", "UNCERTAIN"),
+        ("after_bilibili_send", "UNCERTAIN"),
         ("after_result_before_commit", "SUCCEEDED"),
     ],
 )
@@ -45,6 +47,8 @@ def test_actual_worker_death_at_bilibili_boundaries(setup_bilibili, tmp_path, po
         )
     )
     marker, gate = tmp_path / "crash.json", tmp_path / "release-crash"
+    if point in ("during_bilibili_send", "after_bilibili_send"):
+        control.write_text(json.dumps({"gate": str(tmp_path / "hold-engine-before-submit")}))
     helper = Path(__file__).parents[1] / "helpers/worker_once.py"
     environment = {
         **env_for(database.config),
@@ -70,6 +74,15 @@ def test_actual_worker_death_at_bilibili_boundaries(setup_bilibili, tmp_path, po
                 job = win32job.OpenJobObject(
                     0x0004 | 0x0008, False, attempt["execution"]["job_name"]
                 )
+            if point in ("during_bilibili_send", "after_bilibili_send"):
+                received = Path(attempt["execution"]["result_path"]).with_name(
+                    "fixture-received.json"
+                )
+                if point == "after_bilibili_send":
+                    wait_until(received.is_file)
+                    assert json.loads(received.read_text())["identity"]["task_id"] == task_id
+                else:
+                    assert not received.exists()
             gate.touch()
             assert process.wait(timeout=10) == 91
             store = ExecutionStore(database)
@@ -85,6 +98,9 @@ def test_actual_worker_death_at_bilibili_boundaries(setup_bilibili, tmp_path, po
             Supervisor(store).recover(store.recovery_claim())
             task = service.task(task_id)
             assert task["status"] == expected, task
+            if point in ("during_bilibili_send", "after_bilibili_send"):
+                assert task["attempt_count"] == 1 and task["receipt"] is None
+                assert store.claim() is None
             with database.read() as conn:
                 leases = db.many(conn, select(db.leases).where(db.leases.c.released_at.is_(None)))
                 receipts = db.many(conn, select(db.receipts))

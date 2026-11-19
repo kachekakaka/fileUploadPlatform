@@ -9,20 +9,21 @@ def validate_item(item, deployment, *, b18=None):
     capabilities = deployment.capabilities()
     metadata = item["metadata"]
     options = item["target"]["options"]
-    if b18 is None and (
-        not capabilities.get("upload_ready")
-        or options["publish_mode"] not in capabilities.get("verified_publish_modes", [])
-    ):
-        raise Problem("UNSUPPORTED_OPTION", "该构建尚未声明经验证的发布方式", 409)
-    if (
-        options.get("hide_in_space", False)
-        and capabilities.get("supports_hide_in_space") is not True
-    ):
-        raise Problem("UNSUPPORTED_OPTION", "该构建不支持在个人空间-投稿中隐藏", 409)
-    if (
-        options["publish_mode"] == "self_only"
-        and capabilities.get("supports_self_only") is not True
-    ):
+    publish_mode = options["publish_mode"]
+    if b18 is None:
+        mode_allowed = publish_mode in capabilities.get("verified_publish_modes", []) or (
+            publish_mode == "self_only" and deployment.allow_self_only
+        )
+        if capabilities.get("upload_ready") is not True or not mode_allowed:
+            raise Problem("UNSUPPORTED_OPTION", "当前部署未开放所选发布方式", 409)
+    if options.get("hide_in_space", False):
+        if capabilities.get("supports_hide_in_space") is not True:
+            raise Problem("UNSUPPORTED_OPTION", "该构建不支持在个人空间-投稿中隐藏", 409)
+        if b18 is None and not (
+            deployment.allow_hide_in_space or capabilities.get("verified_hide_in_space") is True
+        ):
+            raise Problem("UNSUPPORTED_OPTION", "当前部署未开放在个人空间-投稿中隐藏", 409)
+    if publish_mode == "self_only" and capabilities.get("supports_self_only") is not True:
         raise Problem("UNSUPPORTED_OPTION", "该构建不支持仅自己可见", 409)
     if any(p["subtitles"] for p in item["parts"]):
         raise Problem("UNSUPPORTED_OPTION", "Bilibili 首版不支持目标引用字幕")

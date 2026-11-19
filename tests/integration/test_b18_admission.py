@@ -176,6 +176,53 @@ def test_self_only_trial_allows_one_private_single_with_supported_engine(setup, 
     assert store.claim() is None
 
 
+def test_public_multi_trial_allows_one_ordered_public_work_without_a_single(setup, tmp_path):
+    service, permit = setup
+    single = permit.pop("single")
+    multi = permit["multi"]
+    allowlist = tmp_path / "allowlist.json"
+    permit["public_multi_trial"] = True
+    for invalid in (
+        {**permit, "single": single},
+        {**permit, "self_only_trial": True},
+        {**permit, "multi": {**multi, "options": {**multi["options"], "hide_in_space": True}}},
+        {**permit, "multi": {**multi, "parts": multi["parts"][:1]}},
+    ):
+        write_json(allowlist, invalid)
+        with pytest.raises(Problem, match="格式无效"):
+            register(service, multi)
+    write_json(allowlist, permit)
+    with pytest.raises(Problem, match="只开放指定的公开多 P"):
+        register(service, single)
+    register(service, multi)
+    manifest = read_manifest(multi["directory"])
+    reversed_manifest = deepcopy(manifest)
+    reversed_manifest["upload_units"][0]["videos"].reverse()
+    with pytest.raises(Problem, match="有序素材"):
+        service.submit(
+            multi["work_id"], uid(), Submission(retry_policy=ONCE, manifest=reversed_manifest)
+        )
+    with pytest.raises(Problem, match="手动立即投稿一次"):
+        service.submit(multi["work_id"], uid(), Submission())
+
+    request = Submission(retry_policy=ONCE)
+    [first] = service.submit(multi["work_id"], uid(), request)[1]["tasks"]
+    [repeated] = service.submit(multi["work_id"], uid(), request)[1]["tasks"]
+    assert repeated["task_id"] == first["task_id"] and not repeated["created"]
+    store = ExecutionStore(service.database)
+    store.register()
+    attempt = store.claim()
+    Supervisor(store).execute(attempt)
+    assert service.task(first["task_id"])["status"] == "SUCCEEDED"
+    [evidence] = (tmp_path / "data" / "executions").glob("*/fixture-received.json")
+    request = json.loads(evidence.read_text())["request"]
+    assert request["options"]["publish_mode"] == "public"
+    assert [part["title"] for part in request["parts"]] == [
+        part["title"] for part in multi["parts"]
+    ]
+    assert store.claim() is None
+
+
 def test_concurrent_requests_restart_and_used_quota(setup, tmp_path):
     service, permit = setup
     work = permit["single"]

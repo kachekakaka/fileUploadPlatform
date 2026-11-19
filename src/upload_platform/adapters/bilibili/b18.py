@@ -72,10 +72,11 @@ class B18Allowlist(StrictModel):
     core_data_dir: str
     engine_build_id: str = Field(min_length=1)
     mid: str = Field(pattern=r"^[1-9][0-9]*$")
-    single: ApprovedWork
+    single: ApprovedWork | None = None
     multi: ApprovedWork | None = None
     supplement: B18Supplement | None = None
     self_only_trial: bool = False
+    public_multi_trial: bool = False
 
     _root = field_validator("core_data_dir")(lexical_root)
 
@@ -86,30 +87,43 @@ class B18Allowlist(StrictModel):
 
     @model_validator(mode="after")
     def approved_works(self):
-        if self.self_only_trial:
+        if self.public_multi_trial:
             if (
-                self.multi is not None
+                self.self_only_trial
+                or self.single is not None
+                or self.multi is None
+                or self.supplement is not None
+                or self.multi.options.hide_in_space
+            ):
+                raise ValueError("候选版补验只允许一份在空间列表中正常显示的公开多 P")
+            works = ((self.multi, 2),)
+        elif self.self_only_trial:
+            if (
+                self.single is None
+                or self.multi is not None
                 or self.supplement is not None
                 or self.single.options.publish_mode != "self_only"
                 or len(self.single.parts) != 1
             ):
                 raise ValueError("仅自己可见验收只允许一份私密单 P")
             return self
-        if self.multi is None:
-            raise ValueError("公开试投须同时指定单 P 和多 P")
-        if (
-            self.single.work_id == self.multi.work_id
-            or self.single.directory == self.multi.directory
-        ):
-            raise ValueError("两份作品需要不同的编号和目录")
-        for work, count in ((self.single, 1), (self.multi, 2)):
+        else:
+            if self.single is None or self.multi is None:
+                raise ValueError("公开试投须同时指定单 P 和多 P")
+            if (
+                self.single.work_id == self.multi.work_id
+                or self.single.directory == self.multi.directory
+            ):
+                raise ValueError("两份作品需要不同的编号和目录")
+            works = ((self.single, 1), (self.multi, 2))
+        for work, count in works:
             if (
                 work.options.publish_mode != "public"
                 or len(work.parts) != count
                 or len({part.video_id for part in work.parts}) != count
                 or len({Path(part.path) for part in work.parts}) != count
             ):
-                raise ValueError("清单须包含一份单 P 和一份两 P 的公开测试稿")
+                raise ValueError("公开试投稿的分 P 数量、素材引用或可见范围无效")
         return self
 
     @classmethod
@@ -144,6 +158,8 @@ class B18Allowlist(StrictModel):
             raise denied("仅允许清单指定的 Bilibili 账号")
         approved = self.single if item["mode"] == "independent" else self.multi
         if approved is None:
+            if self.public_multi_trial:
+                raise denied("本轮只开放指定的公开多 P")
             raise denied("本轮只开放指定的私密单 P")
         fields = posting_fields(item, paths)
         fields["options"] = {"hide_in_space": False, **fields["options"]}
@@ -296,6 +312,8 @@ class B18Allowlist(StrictModel):
         return original
 
     def check_handoff(self, conn, task):
+        if self.public_multi_trial:
+            return
         if self.supplement:
             original = self.require_failed_multi(conn, task["account_id"])
             ledger = db.get(conn, db.ledgers, task["ledger_id"])
@@ -349,5 +367,5 @@ class B18Allowlist(StrictModel):
                 or reserved[0]["account_id"] != item["target"]["account_id"]
             ):
                 raise denied("该 B18 名额已使用")
-        elif item["mode"] == "multipart":
+        elif item["mode"] == "multipart" and not self.public_multi_trial:
             self.require_single_query(conn)

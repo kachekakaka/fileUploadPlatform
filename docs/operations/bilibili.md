@@ -91,6 +91,8 @@ Core 重启后通过原操作恢复已发布的凭据版本。旧进程身份不
 
 私密试投用独立清单，设置 `self_only_trial: true`，只填写一份 `single`，其中 `publish_mode` 为 `self_only`。引擎须声明 `supports_self_only`。使用 `--max-attempts 1` 手动提交，按同一稿件号回查创作中心、投稿账号播放和未登录访问，然后撤下清单。[私密试投验收](../../archive/方案/20261119-B18仅自己可见验收.md)
 
+经单独授权只试投一份公开两 P 时，用独立清单设置 `public_multi_trial: true`，只填写 `multi`，选择 `public` 并关闭空间列表隐藏。使用 `--max-attempts 1` 手动提交，核对同一稿件的回执及两个分段后撤下清单。[候选版公开多 P 验收](../../archive/方案/20261119-B18公开多P线路修复与补测.md)
+
 ## 投稿配置与查询
 
 Target 必须显式选择 `platform: bilibili`、`account: bilibili:<MID>`，以及 `category_id`、`copyright`、`publish_mode`。`copyright=2` 要求非空 `source`，自制稿的来源留空。Core 会拒绝字幕引用、未知选项、超限标题及标签。普通投稿只开放经真实验收的发布方式。执行前还会按账号查询分区能力。

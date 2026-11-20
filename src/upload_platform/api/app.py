@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException
 
+from upload_platform import __version__
 from upload_platform.application.contracts import (
     Registration,
     Submission,
@@ -19,8 +20,12 @@ from upload_platform.application.contracts import (
     ScheduleRequest,
     SchedulePatch,
     Empty,
+    StrictModel,
 )
 from upload_platform.application.service import Service
+from upload_platform.application.dashboard import Dashboard, TaskDetail, TaskPage
+from upload_platform.application.submissions import UnifiedSubmissions
+from upload_platform.api import web
 from upload_platform.application.remote_queries import RemoteQueries
 from upload_platform.application.login_sessions import (
     LoginSessions,
@@ -42,6 +47,13 @@ from upload_platform.infrastructure import database as db
 from upload_platform.scheduling.runtime import ScheduleService
 
 
+class SystemHealth(StrictModel):
+    api: Literal["ready"]
+    database: Literal["ready"]
+    deployment_id: str
+    workers: list[dict]
+
+
 def create_app(config=None, database=None, service=None):
     config = config or Config.from_env()
     database = database or db.Database(config)
@@ -50,10 +62,12 @@ def create_app(config=None, database=None, service=None):
     accounts = Accounts(service)
     login_sessions = LoginSessions(accounts)
     remote_queries = RemoteQueries(service)
+    dashboard = web.DashboardAccess(config)
+    dashboard_data = Dashboard(service, login_sessions)
 
     @asynccontextmanager
     async def lifespan(app):
-        database.initialize()
+        app.state.deployment_id = database.initialize()
         accounts.recover_observers()
         login_sessions.start()
         try:
@@ -63,7 +77,7 @@ def create_app(config=None, database=None, service=None):
             database.close()
 
     app = FastAPI(
-        title="Upload Platform Core MVP", version="0.1.0", lifespan=lifespan, redirect_slashes=False
+        title="Upload Platform", version=__version__, lifespan=lifespan, redirect_slashes=False
     )
     app.state.database, app.state.service = database, service
     app.state.login_sessions = login_sessions
@@ -97,26 +111,60 @@ def create_app(config=None, database=None, service=None):
         )
         if gui and not (gui_route or gui_read):
             return error(request, Problem("forbidden_source", "界面接入标识不允许访问此入口", 403))
-        forbidden = any(
-            name in ("origin", "forwarded", "x-real-ip", "via")
-            or name.startswith("x-forwarded-")
-            or name.startswith("sec-fetch-")
+        forwarded = any(
+            name in ("forwarded", "x-real-ip", "via") or name.startswith("x-forwarded-")
             for name in headers
         )
-        if headers.get("host") != config.host or len(headers.getlist("host")) != 1 or forbidden:
+        if headers.getlist("host") != [config.host] or forwarded:
             return error(
                 request,
-                Problem("forbidden_source", "仅接受指定 loopback 地址上的本机非浏览器请求", 403),
+                Problem("forbidden_source", "只接受指定本机地址且不允许转发头", 403),
             )
-        if request.method in ("POST", "PATCH", "PUT", "DELETE"):
-            if headers.get("x-upload-platform-client") != "cli-v1" and not (gui and gui_route):
+        browser = any(name == "origin" or name.startswith("sec-fetch-") for name in headers)
+        public = path in web.PUBLIC_METHODS
+        if public and request.method == "OPTIONS":
+            try:
+                return web.cors(web.preflight(request))
+            except Problem as exc:
+                return web.cors(error(request, exc))
+        dashboard_api = (
+            not public
+            and path.startswith("/api/v1/")
+            and (browser or path == web.DASHBOARD_SESSION)
+        )
+        request.state.dashboard = dashboard_api
+        if dashboard_api:
+            try:
+                if gui:
+                    raise Problem("forbidden_source", "桥接接口只接受本机程序请求", 403)
+                dashboard.authorize(request)
+            except Problem as exc:
+                return error(request, exc)
+        deployment_id = app.state.deployment_id if path.startswith(web.PREFIX + "/") else None
+        expected = headers.getlist(web.DEPLOYMENT_HEADER)
+        if deployment_id and expected and expected != [deployment_id]:
+            conflict = error(request, Problem("binding", "上传平台部署已切换，请核对原单", 409))
+            conflict.headers[web.DEPLOYMENT_HEADER] = deployment_id
+            conflict.headers["Cache-Control"] = "no-store"
+            return web.cors(conflict) if public else conflict
+        if request.method in web.WRITES:
+            if not (public or dashboard_api or (gui and gui_route)) and (
+                headers.get("x-upload-platform-client") != "cli-v1"
+            ):
                 return error(request, Problem("forbidden_source", "修改请求缺少客户端标识", 403))
             if headers.get("content-type", "").split(";")[0].strip().lower() != "application/json":
-                return error(
+                denied = error(
                     request, Problem("invalid_content_type", "修改请求只接受 application/json", 400)
                 )
+                return web.cors(denied) if public else denied
         response = await call_next(request)
-        if gui_route:
+        if public:
+            web.cors(response)
+        if deployment_id:
+            response.headers[web.DEPLOYMENT_HEADER] = deployment_id
+        if path == web.PREFIX + "/system/health":
+            response.headers["Cache-Control"] = "no-store"
+        if gui_route or (dashboard_api and not path.endswith("/events/stream")):
             response.headers["Cache-Control"] = "no-store"
             response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Request-ID"] = request.state.request_id
@@ -171,8 +219,10 @@ def create_app(config=None, database=None, service=None):
     def key(request):
         return request.headers.get("idempotency-key")
 
-    def response(result):
+    def response(result, request=None):
         status, data = result
+        if request is not None:
+            data = web.management_view(request, data)
         return JSONResponse(data, status_code=status)
 
     prefix = "/api/v1"
@@ -230,7 +280,7 @@ def create_app(config=None, database=None, service=None):
 
     @app.patch(prefix + "/accounts/{account_id}")
     def account_enabled(account_id: str, body: AccountEnabled, request: Request):
-        return response(accounts.enabled(account_id, key(request), body))
+        return response(accounts.enabled(account_id, key(request), body), request)
 
     @app.post(prefix + "/account-maintenance", status_code=201)
     def maintenance_create(body: MaintenanceRequest, request: Request):
@@ -287,30 +337,47 @@ def create_app(config=None, database=None, service=None):
         service.work(work_id)
         return service.listing(db.tasks, limit, cursor, work_id=work_id)
 
-    @app.get(prefix + "/tasks")
+    @app.get(prefix + "/tasks", response_model=TaskPage)
     def tasks(
         limit: int = Query(50, ge=1, le=200),
         cursor: str | None = None,
         work_id: str | None = None,
         status: str | None = None,
+        platform: Literal["bilibili", "fake"] | None = None,
+        account_id: str | None = None,
+        since: str | None = None,
+        until: str | None = None,
+        sort: Literal["newest", "oldest"] | None = None,
     ):
         if status and status not in TASK_TRANSITIONS:
             raise Problem("invalid_status", "未知任务状态")
-        return service.listing(db.tasks, limit, cursor, work_id=work_id, status=status)
+        return dashboard_data.tasks(
+            limit, cursor, sort, work_id, status, account_id, platform, since, until
+        )
 
-    @app.get(prefix + "/tasks/{task_id}")
-    def task(task_id: str):
-        return service.task(task_id)
+    @app.get(
+        prefix + "/tasks/{task_id}", response_model=TaskDetail, response_model_exclude_unset=True
+    )
+    def task(task_id: str, request: Request):
+        data = service.task(task_id)
+        actions = service.available_actions(data)
+        query_reason = None
+        try:
+            remote_queries.prepare(task_id)
+        except Problem as exc:
+            query_reason = exc.message
+        actions["query"] = {"allowed": query_reason is None, "reason": query_reason}
+        return web.management_view(request, {**data, "available_actions": actions})
 
     @app.post(prefix + "/tasks/{task_id}/query")
     def task_query(task_id: str, body: Empty, request: Request):
-        return response(remote_queries.query(task_id, key(request)))
+        return response(remote_queries.query(task_id, key(request)), request)
 
     @app.get(prefix + "/tasks/{task_id}/queries")
-    def task_queries(task_id: str):
+    def task_queries(task_id: str, request: Request):
         service.task(task_id)
         with database.read() as conn:
-            return {
+            value = {
                 "items": db.many(
                     conn,
                     select(db.remote_queries)
@@ -318,6 +385,8 @@ def create_app(config=None, database=None, service=None):
                     .order_by(db.remote_queries.c.started_at.desc()),
                 )
             }
+
+        return web.management_view(request, value)
 
     @app.post(prefix + "/tasks/{task_id}/cancel")
     def cancel(task_id: str, body: Empty, request: Request):
@@ -334,9 +403,16 @@ def create_app(config=None, database=None, service=None):
         return response(service.resolve(task_id, key(request), body))
 
     @app.get(prefix + "/tasks/{task_id}/attempts")
-    def attempts(task_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None):
+    def attempts(
+        task_id: str,
+        request: Request,
+        limit: int = Query(50, ge=1, le=200),
+        cursor: str | None = None,
+    ):
         service.task(task_id)
-        return service.listing(db.attempts, limit, cursor, task_id=task_id)
+        return web.management_view(
+            request, service.listing(db.attempts, limit, cursor, task_id=task_id)
+        )
 
     @app.get(prefix + "/tasks/{task_id}/resolutions")
     def resolutions(task_id: str, limit: int = Query(50, ge=1, le=200), cursor: str | None = None):
@@ -386,8 +462,15 @@ def create_app(config=None, database=None, service=None):
         return response(schedules.create(key(request), body))
 
     @app.get(prefix + "/schedules")
-    def list_schedules(limit: int = Query(50, ge=1, le=200), cursor: str | None = None):
-        return service.listing(db.schedules, limit, cursor)
+    def list_schedules(
+        limit: int = Query(50, ge=1, le=200),
+        cursor: str | None = None,
+        view: Literal["summary"] | None = None,
+    ):
+        page = service.listing(db.schedules, limit, cursor)
+        if view == "summary":
+            page["items"] = [schedules.with_recent_run(row) for row in page["items"]]
+        return page
 
     @app.get(prefix + "/schedules/{schedule_id}")
     def get_schedule(schedule_id: str):
@@ -408,7 +491,15 @@ def create_app(config=None, database=None, service=None):
     def schedule_run(run_id: str):
         return schedules.run_detail(run_id)
 
-    @app.get(prefix + "/system/health")
+    @app.get(prefix + "/platforms")
+    def platforms():
+        return {"items": dashboard_data.platforms()}
+
+    @app.get(prefix + "/system/overview")
+    def overview():
+        return dashboard_data.overview(app.version)
+
+    @app.get(prefix + "/system/health", response_model=SystemHealth)
     def health():
         with database.read() as conn:
             conn.execute(select(db.schema_version)).all()
@@ -416,6 +507,7 @@ def create_app(config=None, database=None, service=None):
         return {
             "api": "ready",
             "database": "ready",
+            "deployment_id": app.state.deployment_id,
             "workers": [
                 {
                     **worker,
@@ -425,6 +517,8 @@ def create_app(config=None, database=None, service=None):
                 for worker in registered
             ],
         }
+
+    web.attach_web(app, config, dashboard, UnifiedSubmissions(service))
 
     def public_openapi():
         if app.openapi_schema is not None:
@@ -443,7 +537,17 @@ def create_app(config=None, database=None, service=None):
         }
         for path, methods in schema["paths"].items():
             for method, operation in methods.items():
-                if method in ("post", "patch"):
+                if path.startswith(web.PREFIX + "/"):
+                    operation.setdefault("parameters", []).append(
+                        {
+                            "name": web.DEPLOYMENT_HEADER,
+                            "in": "header",
+                            "required": False,
+                            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+                            "schema": {"type": "string", "format": "uuid"},
+                        }
+                    )
+                if method in ("post", "patch") and path not in web.PUBLIC_METHODS:
                     headers = [
                         {
                             "name": "X-Upload-Platform-Client",

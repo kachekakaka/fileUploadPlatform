@@ -12,6 +12,7 @@ from upload_platform.application.contracts import (
     SchedulePatch,
 )
 from upload_platform.application.manifest import validate_manifest
+from upload_platform.application.submissions import ManifestFiles, SubmissionPaths
 from upload_platform.domain.core import (
     Problem,
     uid,
@@ -69,14 +70,19 @@ class Service:
     def __init__(self, database, clock=now, fault=None):
         self.database, self.clock = database, clock
         self.fault = fault or (lambda point: None)
+        self.manifest_files = ManifestFiles(database.config)
 
-    def replay(self, conn, scope, key, request):
-        record = db.one(
+    @staticmethod
+    def receipt_record(conn, scope, key):
+        return db.one(
             conn,
             select(db.idempotency).where(
                 db.idempotency.c.scope == scope, db.idempotency.c.key == key
             ),
         )
+
+    def replay(self, conn, scope, key, request):
+        record = self.receipt_record(conn, scope, key)
         if record:
             if record["request"] != request:
                 raise Problem("idempotency_conflict", "相同 Key 的请求正文不同", 409)
@@ -93,7 +99,14 @@ class Service:
             existing = self.replay(conn, scope, key, request)
         if existing is not None:
             return existing
-        prepared = prepare()
+        try:
+            prepared = prepare()
+        except Problem:
+            with self.database.read() as conn:
+                existing = self.replay(conn, scope, key, request)
+            if existing is not None:
+                return existing
+            raise
         with self.database.transaction() as conn:
             existing = self.replay(conn, scope, key, request)
             if existing is not None:
@@ -114,8 +127,8 @@ class Service:
         self.fault("after_commit")
         return status, response
 
-    def prepare_work(self, directory, manifest):
-        prepared = validate_manifest(directory, manifest)
+    def prepare_work(self, directory, manifest, *, fixed_root=False):
+        prepared = validate_manifest(directory, manifest, fixed_root=fixed_root)
         with self.database.read() as conn:
             accounts = db.many(conn, select(db.accounts))
         for unit in prepared["manifest"]["upload_units"]:
@@ -153,6 +166,16 @@ class Service:
                 validate_item(item, self.database.config.bilibili, b18=permit)
         return prepared
 
+    @staticmethod
+    def public_manifest(manifest):
+        public = json.loads(canonical(manifest))
+        for unit in public["upload_units"]:
+            for target in unit["targets"]:
+                target.pop("account_id", None)
+                target.pop("expected_mid", None)
+                target.pop("engine_build_id", None)
+        return public
+
     def save_work(self, conn, prepared):
         at, manifest = self.clock(), prepared["manifest"]
         work_id = manifest["work"]["id"]
@@ -162,13 +185,21 @@ class Service:
             conn.execute(insert(db.roots).values(**root))
         existing = db.one(conn, select(db.works).where(db.works.c.id == work_id))
         # Internal account IDs belong to the snapshot, not the public manifest.
-        public = json.loads(canonical(manifest))
-        for unit in public["upload_units"]:
-            for target in unit["targets"]:
-                target.pop("account_id", None)
-                target.pop("expected_mid", None)
-                target.pop("engine_build_id", None)
-        values = {"root_id": root["id"], "manifest": public, "updated_at": at}
+        public = self.public_manifest(manifest)
+        metadata = ("manifest_path", "config_version", "source")
+        if (
+            existing
+            and prepared.get("config_version") is None
+            and existing["root_id"] == root["id"]
+            and existing["manifest"] == public
+        ):
+            prepared.update({field: existing[field] for field in metadata})
+        values = {
+            "root_id": root["id"],
+            "manifest": public,
+            "updated_at": at,
+            **{field: prepared.get(field) for field in metadata},
+        }
         if existing:
             conn.execute(update(db.works).where(db.works.c.id == work_id).values(**values))
         else:
@@ -207,7 +238,13 @@ class Service:
                 )
             for target in unit["targets"]:
                 account = db.get(conn, db.accounts, target["account_id"])
-                if account["status"] != "ACTIVE":
+                if account["status"] != "ACTIVE" or (
+                    target["platform"] == "bilibili"
+                    and (
+                        not account["enabled"]
+                        or target["expected_mid"] != account["remote_user_id"]
+                    )
+                ):
                     raise Problem("invalid_account", "目标账号已停用", 409)
                 target_id = uid()
                 if target["enabled"]:
@@ -252,6 +289,13 @@ class Service:
             timestamp(execution.scheduled_at) if execution.execution_type == "scheduled" else at
         )
         snapshot = {**item, "root_id": saved["root_id"], "directory": prepared["directory"]}
+        if prepared.get("config_version"):
+            snapshot.update(
+                manifest=self.public_manifest(prepared["manifest"]),
+                manifest_path=prepared["manifest_path"],
+                config_version=prepared["config_version"],
+                source=prepared.get("source"),
+            )
         if b18:
             snapshot["b18_run_id"] = b18.run_id
         snapshot["assets"] = [
@@ -395,12 +439,17 @@ class Service:
         directory = (
             request.directory if request and request.directory is not None else root["directory"]
         )
-        manifest = (
-            request.manifest
-            if request and request.manifest is not None
-            else read_manifest(directory)
-        )
-        prepared = self.prepare_work(directory, manifest)
+        if request and request.manifest is not None:
+            prepared = self.prepare_work(directory, request.manifest)
+        elif work["manifest_path"]:
+            paths = SubmissionPaths(manifest_path=work["manifest_path"], asset_root=directory)
+            manifest, directory, revision = self.manifest_files.read(paths)
+            prepared = self.prepare_work(directory, manifest, fixed_root=True)
+            prepared.update(
+                manifest_path=paths.manifest_path, config_version=revision, source=work["source"]
+            )
+        else:
+            prepared = self.prepare_work(directory, read_manifest(directory))
         if prepared["manifest"]["work"]["id"] != work_id:
             raise Problem("work_id_mismatch", "manifest.work.id 必须与 URL 作品编号一致")
         return prepared
@@ -429,11 +478,7 @@ class Service:
                 if canonical({key: ledger[key] for key in fields}) not in identities
             ]
         public = json.loads(canonical(prepared))
-        for unit in public["manifest"]["upload_units"]:
-            for target in unit["targets"]:
-                target.pop("account_id", None)
-                target.pop("expected_mid", None)
-                target.pop("engine_build_id", None)
+        public["manifest"] = self.public_manifest(public["manifest"])
         return public
 
     def submit(self, work_id, key, request: Submission, previous=None):
@@ -451,32 +496,65 @@ class Service:
             201,
         )
 
+    @staticmethod
+    def cancel_barrier(conn, task):
+        if (
+            task["snapshot"]["target"]["platform"] != "bilibili"
+            or task["status"] in TERMINAL
+            or not task["current_attempt_id"]
+        ):
+            return False
+        attempt = db.get(conn, db.attempts, task["current_attempt_id"])
+        if attempt["handed_off_at"] is None:
+            return False
+        return (
+            task["status"] != "RETRY_WAIT"
+            or not attempt["exit_confirmed"]
+            or db.one(
+                conn,
+                select(db.leases).where(
+                    db.leases.c.attempt_id == attempt["id"], db.leases.c.released_at.is_(None)
+                ),
+            )
+            is not None
+        )
+
+    def available_actions(self, task):
+        with self.database.read() as conn:
+            handed_off = self.cancel_barrier(conn, task)
+            ledger = db.get(conn, db.ledgers, task["ledger_id"])
+        resubmit_reason = None
+        if task["status"] not in DEFINITE or ledger["current_task_id"] != task["id"]:
+            resubmit_reason = "只可重提结果明确的当前任务"
+        elif "b18_run_id" in task["snapshot"]:
+            permit = B18Allowlist.load(self.database.config)
+            if not (permit and permit.supplement):
+                resubmit_reason = "受控投稿名额已使用"
+        cancel_reason = None
+        if task["status"] in TERMINAL:
+            cancel_reason = "任务已经结束或需要核验"
+        elif task["cancel_requested_at"] is not None:
+            cancel_reason = "已请求取消"
+        elif handed_off:
+            cancel_reason = "任务已经交接给 Bilibili 引擎"
+        return {
+            name: {"allowed": reason is None, "reason": reason}
+            for name, reason in {
+                "cancel": cancel_reason,
+                "resubmit": resubmit_reason,
+                "resolve": None if task["status"] == "UNCERTAIN" else "任务无需人工核验",
+            }.items()
+        }
+
     def cancel(self, task_id, key, request):
         def action(conn, _):
             task, at = db.get(conn, db.tasks, task_id), self.clock()
-            if (
-                task["snapshot"]["target"]["platform"] == "bilibili"
-                and task["status"] not in TERMINAL
-                and task["current_attempt_id"]
-            ):
-                attempt = db.get(conn, db.attempts, task["current_attempt_id"])
-                safe_next_attempt = (
-                    task["status"] == "RETRY_WAIT"
-                    and attempt["exit_confirmed"]
-                    and not db.one(
-                        conn,
-                        select(db.leases).where(
-                            db.leases.c.attempt_id == attempt["id"],
-                            db.leases.c.released_at.is_(None),
-                        ),
-                    )
+            if self.cancel_barrier(conn, task):
+                raise Problem(
+                    "cancellation_not_supported_after_handoff",
+                    "任务已交接给 Bilibili 引擎，首版不支持取消该次执行",
+                    409,
                 )
-                if attempt["handed_off_at"] is not None and not safe_next_attempt:
-                    raise Problem(
-                        "cancellation_not_supported_after_handoff",
-                        "任务已交接给 Bilibili 引擎，首版不支持取消该次执行",
-                        409,
-                    )
             if task["status"] not in TERMINAL:
                 if task["status"] in ("QUEUED", "RETRY_WAIT"):
                     task = task_state(conn, task, "CANCELLED", at, cancel_requested_at=at)
@@ -623,7 +701,11 @@ class Service:
                 .all()
             )
             return {
-                **work,
+                **{
+                    key: value
+                    for key, value in work.items()
+                    if value is not None or key not in ("config_version", "manifest_path", "source")
+                },
                 **aggregate(states),
                 "directory": db.get(conn, db.roots, work["root_id"])["directory"],
             }

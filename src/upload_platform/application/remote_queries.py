@@ -80,6 +80,14 @@ class RemoteQueries:
         # Reserve a durable account operation before any credential process can be started.
         def create(conn, prepared):
             task, account, engine, keys, evidence = prepared
+            if db.get(conn, db.tasks, task_id)["version"] != task["version"]:
+                raise Problem("version_conflict", "任务状态或版本已经变化", 409)
+            current_account = db.get(conn, db.accounts, account["id"])
+            if any(
+                current_account[name] != account[name]
+                for name in ("remote_user_id", "credential_reference", "version")
+            ):
+                raise Problem("version_conflict", "查询账号已经变化", 409)
             if db.one(
                 conn,
                 select(db.account_maintenance).where(

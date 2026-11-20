@@ -7,7 +7,7 @@ from upload_platform.domain.core import Problem
 from upload_platform.infrastructure.files import asset_info, root_path
 
 
-def validate_manifest(directory, value):
+def validate_manifest(directory, value, *, fixed_root=False):
     try:
         model = value if isinstance(value, Manifest) else Manifest.model_validate(value)
     except ValidationError as exc:
@@ -17,11 +17,17 @@ def validate_manifest(directory, value):
             details={"errors": exc.errors(include_input=False, include_context=False)},
         ) from exc
     root = str(root_path(directory))
+    if fixed_root and root != directory:
+        raise Problem("invalid_path", "已校验的素材根目录位置已改变")
     manifest = model.normalized()
     assets = {}
     for role, group in manifest["assets"].items():
         for item in group:
-            assets[item["id"]] = {**item, "role": role, **asset_info(root, item["path"])}
+            assets[item["id"]] = {
+                **item,
+                "role": role,
+                **asset_info(root, item["path"], fixed_root=fixed_root),
+            }
     expanded = []
     fields = ("title", "description", "tags", "cover")
     for unit in manifest["upload_units"]:

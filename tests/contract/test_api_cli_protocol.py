@@ -105,8 +105,13 @@ def test_stable_pagination_and_health_without_worker(api, submit_work):
     assert second["next_cursor"] is None
     assert api.get("/api/v1/tasks?limit=201").status_code == 422
     assert api.get("/api/v1/tasks?status=BOGUS").status_code == 422
-    health = api.get("/api/v1/system/health").json()
-    assert health == {"api": "ready", "database": "ready", "workers": []}
+    health = api.get("/api/v1/system/health")
+    assert health.json() == {
+        "api": "ready",
+        "database": "ready",
+        "workers": [],
+        "deployment_id": health.headers["X-Upload-Platform-Deployment"],
+    }
 
 
 def test_schedule_api_versions_schema_and_idempotency(api, tmp_path):

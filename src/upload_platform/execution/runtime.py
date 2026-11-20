@@ -76,7 +76,11 @@ class Supervisor:
                 return
             try:
                 for asset in task["snapshot"]["assets"]:
-                    asset_info(task["snapshot"]["directory"], asset["relative_path"])
+                    asset_info(
+                        task["snapshot"]["directory"],
+                        asset["relative_path"],
+                        fixed_root="config_version" in task["snapshot"],
+                    )
             except Problem:
                 self.store.finish(
                     original, "permanent", proof="no_execution_intent", error="asset_unavailable"

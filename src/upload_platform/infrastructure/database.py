@@ -3,6 +3,7 @@ from pathlib import Path
 import re
 import sqlite3
 import time
+from uuid import UUID
 
 from sqlalchemy import (
     MetaData,
@@ -30,7 +31,7 @@ from upload_platform.domain.core import Problem, uid, now, TASK_TRANSITIONS, ATT
 
 
 metadata = MetaData()
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 4
 
 
 def col(name, kind=String, **kw):
@@ -45,7 +46,11 @@ def table(name, *columns):
     return Table(name, metadata, col("id", primary_key=True), *columns)
 
 
-schema_version = table("schema_version", col("version", Integer, nullable=False))
+schema_version = table(
+    "schema_version",
+    col("version", Integer, nullable=False),
+    col("deployment_id", nullable=False),
+)
 accounts = table(
     "accounts",
     col("platform", nullable=False),
@@ -105,6 +110,9 @@ works = table(
     "upload_works",
     ref("root_id", "source_roots.id", nullable=False),
     col("manifest", JSON, nullable=False),
+    col("manifest_path"),
+    col("config_version"),
+    col("source", JSON),
     col("created_at", Float, nullable=False),
     col("updated_at", Float, nullable=False),
 )
@@ -498,7 +506,12 @@ class Database:
             ).all()
             if not existing:
                 metadata.create_all(conn)
-                conn.execute(insert(schema_version).values(id="core", version=SCHEMA_VERSION))
+                deployment_id = uid()
+                conn.execute(
+                    insert(schema_version).values(
+                        id="core", version=SCHEMA_VERSION, deployment_id=deployment_id
+                    )
+                )
                 conn.execute(
                     insert(accounts).values(
                         id=uid(),
@@ -514,6 +527,13 @@ class Database:
                 version = one(conn, select(schema_version))
                 if not version or version["version"] != SCHEMA_VERSION:
                     raise Problem("unsupported_database", "数据库版本不受支持", 503)
+                deployment_id = version["deployment_id"]
+                try:
+                    identifier = UUID(deployment_id)
+                    if identifier.version != 4 or str(identifier) != deployment_id:
+                        raise ValueError()
+                except (ValueError, TypeError, AttributeError) as exc:
+                    raise Problem("invalid_database", "数据库部署编号缺失或无效", 503) from exc
                 if conn.exec_driver_sql("PRAGMA foreign_key_check").first():
                     raise Problem("invalid_database", "数据库外键一致性检查失败", 503)
                 fake = one(conn, select(accounts).where(accounts.c.reference == "fake-default"))
@@ -540,6 +560,7 @@ class Database:
                 ):
                     raise
                 time.sleep(0.02)
+        return deployment_id
 
     def _validate_structure(self, existing):
         actual = {name: _sql_normalize(sql) for name, sql in existing if sql}

@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Upload Platform Core MVP",
-    "version": "0.1.0"
+    "title": "Upload Platform",
+    "version": "0.2.0"
   },
   "paths": {
     "/api/v1/accounts": {
@@ -25,6 +25,16 @@
                 }
               ],
               "title": "View"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -195,7 +205,19 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/account-login-sessions": {
@@ -296,6 +318,16 @@
         },
         "parameters": [
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -346,6 +378,16 @@
                 }
               ],
               "title": "Account Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -445,6 +487,16 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -554,6 +606,16 @@
               "type": "string",
               "title": "Challenge Id"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -653,6 +715,16 @@
             "schema": {
               "type": "string",
               "title": "Session Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -786,6 +858,16 @@
             }
           },
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -913,6 +995,16 @@
             "schema": {
               "type": "string",
               "title": "Account Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -1122,6 +1214,16 @@
         },
         "parameters": [
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -1154,6 +1256,16 @@
             "schema": {
               "type": "string",
               "title": "Operation Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -1251,6 +1363,16 @@
             "schema": {
               "type": "string",
               "title": "Operation Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -1379,6 +1501,16 @@
             }
           },
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -1504,6 +1636,16 @@
             }
           },
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -1626,6 +1768,16 @@
             "schema": {
               "type": "string",
               "title": "Operation Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -1835,6 +1987,16 @@
         },
         "parameters": [
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -1884,6 +2046,16 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -1982,6 +2154,16 @@
               "type": "string",
               "title": "Work Id"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -2078,6 +2260,16 @@
             "schema": {
               "type": "string",
               "title": "Work Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -2194,6 +2386,16 @@
             "schema": {
               "type": "string",
               "title": "Work Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -2348,6 +2550,16 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -2496,6 +2708,104 @@
               ],
               "title": "Status"
             }
+          },
+          {
+            "name": "platform",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "bilibili",
+                    "fake"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Platform"
+            }
+          },
+          {
+            "name": "account_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Account Id"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "newest",
+                    "oldest"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -2503,7 +2813,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TaskPage"
+                }
               }
             }
           },
@@ -2593,6 +2905,16 @@
               "type": "string",
               "title": "Task Id"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -2600,7 +2922,9 @@
             "description": "Successful Response",
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetail"
+                }
               }
             }
           },
@@ -2689,6 +3013,16 @@
             "schema": {
               "type": "string",
               "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -2815,6 +3149,16 @@
               "type": "string",
               "title": "Task Id"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -2911,6 +3255,16 @@
             "schema": {
               "type": "string",
               "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -3039,6 +3393,16 @@
             }
           },
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -3161,6 +3525,16 @@
             "schema": {
               "type": "string",
               "title": "Task Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -3315,6 +3689,16 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -3440,6 +3824,16 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -3560,6 +3954,16 @@
               "default": 50,
               "title": "Limit"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -3667,6 +4071,16 @@
               "minimum": 0,
               "default": 0,
               "title": "After Sequence"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -3848,6 +4262,16 @@
         },
         "parameters": [
           {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
             "name": "X-Upload-Platform-Client",
             "in": "header",
             "required": true,
@@ -3897,6 +4321,33 @@
                 }
               ],
               "title": "Cursor"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "const": "summary",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "View"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           }
         ],
@@ -3995,6 +4446,16 @@
               "type": "string",
               "title": "Schedule Id"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -4089,6 +4550,16 @@
             "schema": {
               "type": "string",
               "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
             }
           },
           {
@@ -4243,6 +4714,16 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -4340,6 +4821,16 @@
               "type": "string",
               "title": "Run Id"
             }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ],
         "responses": {
@@ -4424,10 +4915,10 @@
         }
       }
     },
-    "/api/v1/system/health": {
+    "/api/v1/platforms": {
       "get": {
-        "summary": "Health",
-        "operationId": "health_api_v1_system_health_get",
+        "summary": "Platforms",
+        "operationId": "platforms_api_v1_platforms_get",
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -4488,6 +4979,562 @@
             }
           },
           "422": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/system/overview": {
+      "get": {
+        "summary": "Overview",
+        "operationId": "overview_api_v1_system_overview_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "400": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/system/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_v1_system_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemHealth"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/submissions/preview": {
+      "post": {
+        "summary": "Preview",
+        "operationId": "preview_api_v1_submissions_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubmissionPaths"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionPreview"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/submissions": {
+      "post": {
+        "summary": "Submit",
+        "operationId": "submit_api_v1_submissions_post",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AutomaticSubmission"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ManualSubmission"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/submissions/result": {
+      "get": {
+        "summary": "Result",
+        "operationId": "result_api_v1_submissions_result_get",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "name": "X-Upload-Platform-Deployment",
+            "in": "header",
+            "required": false,
+            "description": "预期部署 UUID。与当前数据库不符时返回 409，业务操作不会执行。",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmissionReceipt"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "统一错误响应",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "410": {
             "description": "统一错误响应",
             "content": {
               "application/json": {
@@ -4639,6 +5686,48 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Assets"
+      },
+      "AutomaticSubmission": {
+        "properties": {
+          "manifest_path": {
+            "type": "string",
+            "maxLength": 32767,
+            "minLength": 1,
+            "title": "Manifest Path"
+          },
+          "asset_root": {
+            "type": "string",
+            "maxLength": 32767,
+            "minLength": 1,
+            "title": "Asset Root"
+          },
+          "expected_version": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Expected Version"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/Immediate"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubmissionSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "manifest_path",
+          "asset_root",
+          "expected_version"
+        ],
+        "title": "AutomaticSubmission"
       },
       "BilibiliOptions": {
         "properties": {
@@ -4872,6 +5961,19 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "Immediate": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "immediate",
+            "title": "Type",
+            "default": "immediate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Immediate"
       },
       "LoginError": {
         "properties": {
@@ -5138,6 +6240,34 @@
           "upload_units"
         ],
         "title": "Manifest"
+      },
+      "ManualSubmission": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "format": "uuid4",
+            "title": "Preview Id"
+          },
+          "execution": {
+            "$ref": "#/components/schemas/Immediate"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SubmissionSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id"
+        ],
+        "title": "ManualSubmission"
       },
       "Metadata": {
         "properties": {
@@ -5516,6 +6646,147 @@
         "type": "object",
         "title": "Submission"
       },
+      "SubmissionPaths": {
+        "properties": {
+          "manifest_path": {
+            "type": "string",
+            "maxLength": 32767,
+            "minLength": 1,
+            "title": "Manifest Path"
+          },
+          "asset_root": {
+            "type": "string",
+            "maxLength": 32767,
+            "minLength": 1,
+            "title": "Asset Root"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "manifest_path",
+          "asset_root"
+        ],
+        "title": "SubmissionPaths"
+      },
+      "SubmissionPreview": {
+        "properties": {
+          "preview_id": {
+            "type": "string",
+            "title": "Preview Id"
+          },
+          "work_id": {
+            "type": "string",
+            "title": "Work Id"
+          },
+          "config_version": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Config Version"
+          },
+          "expires_at": {
+            "type": "string",
+            "title": "Expires At"
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/Manifest"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "preview_id",
+          "work_id",
+          "config_version",
+          "expires_at",
+          "manifest",
+          "warnings"
+        ],
+        "title": "SubmissionPreview"
+      },
+      "SubmissionReceipt": {
+        "properties": {
+          "work_id": {
+            "type": "string",
+            "title": "Work Id"
+          },
+          "task_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Task Ids"
+          },
+          "status": {
+            "type": "string",
+            "const": "accepted",
+            "title": "Status"
+          },
+          "config_version": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Config Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "work_id",
+          "task_ids",
+          "status",
+          "config_version"
+        ],
+        "title": "SubmissionReceipt"
+      },
+      "SubmissionSource": {
+        "properties": {
+          "application": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Application"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "external_reference": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "External Reference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "application"
+        ],
+        "title": "SubmissionSource"
+      },
       "Subtitle": {
         "properties": {
           "id": {
@@ -5555,6 +6826,451 @@
           "gui_login"
         ],
         "title": "SystemCapabilities"
+      },
+      "SystemHealth": {
+        "properties": {
+          "api": {
+            "type": "string",
+            "const": "ready",
+            "title": "Api"
+          },
+          "database": {
+            "type": "string",
+            "const": "ready",
+            "title": "Database"
+          },
+          "deployment_id": {
+            "type": "string",
+            "title": "Deployment Id"
+          },
+          "workers": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Workers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "api",
+          "database",
+          "deployment_id",
+          "workers"
+        ],
+        "title": "SystemHealth"
+      },
+      "TaskAction": {
+        "properties": {
+          "allowed": {
+            "type": "boolean",
+            "title": "Allowed"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "allowed",
+          "reason"
+        ],
+        "title": "TaskAction"
+      },
+      "TaskDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "work_id": {
+            "type": "string",
+            "title": "Work Id"
+          },
+          "unit_id": {
+            "type": "string",
+            "title": "Unit Id"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "ledger_id": {
+            "type": "string",
+            "title": "Ledger Id"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "previous_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Task Id"
+          },
+          "submission_round": {
+            "type": "integer",
+            "title": "Submission Round"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Snapshot"
+          },
+          "execution_type": {
+            "type": "string",
+            "title": "Execution Type"
+          },
+          "scheduled_at": {
+            "type": "number",
+            "title": "Scheduled At"
+          },
+          "max_lateness_seconds": {
+            "type": "integer",
+            "title": "Max Lateness Seconds"
+          },
+          "retry_policy": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Retry Policy"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "next_attempt_at": {
+            "type": "number",
+            "title": "Next Attempt At"
+          },
+          "current_attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Attempt Id"
+          },
+          "fence": {
+            "type": "integer",
+            "title": "Fence"
+          },
+          "cancel_requested_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Requested At"
+          },
+          "created_at": {
+            "type": "number",
+            "title": "Created At",
+            "description": "Unix time in seconds"
+          },
+          "updated_at": {
+            "type": "number",
+            "title": "Updated At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          },
+          "attempt": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "receipt": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt"
+          },
+          "evidence_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Ref"
+          },
+          "available_actions": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TaskAction"
+            },
+            "type": "object",
+            "title": "Available Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "work_id",
+          "unit_id",
+          "target_id",
+          "ledger_id",
+          "account_id",
+          "previous_task_id",
+          "submission_round",
+          "status",
+          "version",
+          "snapshot",
+          "execution_type",
+          "scheduled_at",
+          "max_lateness_seconds",
+          "retry_policy",
+          "attempt_count",
+          "next_attempt_at",
+          "current_attempt_id",
+          "fence",
+          "cancel_requested_at",
+          "created_at",
+          "updated_at",
+          "completed_at",
+          "attempt",
+          "receipt",
+          "available_actions"
+        ],
+        "title": "TaskDetail"
+      },
+      "TaskPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskRow"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "title": "TaskPage"
+      },
+      "TaskRow": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "work_id": {
+            "type": "string",
+            "title": "Work Id"
+          },
+          "unit_id": {
+            "type": "string",
+            "title": "Unit Id"
+          },
+          "target_id": {
+            "type": "string",
+            "title": "Target Id"
+          },
+          "ledger_id": {
+            "type": "string",
+            "title": "Ledger Id"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account Id"
+          },
+          "previous_task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Task Id"
+          },
+          "submission_round": {
+            "type": "integer",
+            "title": "Submission Round"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "snapshot": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Snapshot"
+          },
+          "execution_type": {
+            "type": "string",
+            "title": "Execution Type"
+          },
+          "scheduled_at": {
+            "type": "number",
+            "title": "Scheduled At"
+          },
+          "max_lateness_seconds": {
+            "type": "integer",
+            "title": "Max Lateness Seconds"
+          },
+          "retry_policy": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Retry Policy"
+          },
+          "attempt_count": {
+            "type": "integer",
+            "title": "Attempt Count"
+          },
+          "next_attempt_at": {
+            "type": "number",
+            "title": "Next Attempt At"
+          },
+          "current_attempt_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Attempt Id"
+          },
+          "fence": {
+            "type": "integer",
+            "title": "Fence"
+          },
+          "cancel_requested_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancel Requested At"
+          },
+          "created_at": {
+            "type": "number",
+            "title": "Created At",
+            "description": "Unix time in seconds"
+          },
+          "updated_at": {
+            "type": "number",
+            "title": "Updated At"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "work_id",
+          "unit_id",
+          "target_id",
+          "ledger_id",
+          "account_id",
+          "previous_task_id",
+          "submission_round",
+          "status",
+          "version",
+          "snapshot",
+          "execution_type",
+          "scheduled_at",
+          "max_lateness_seconds",
+          "retry_policy",
+          "attempt_count",
+          "next_attempt_at",
+          "current_attempt_id",
+          "fence",
+          "cancel_requested_at",
+          "created_at",
+          "updated_at",
+          "completed_at"
+        ],
+        "title": "TaskRow"
       },
       "Unit": {
         "properties": {

@@ -138,7 +138,39 @@ class ScheduleService:
                 .join(db.tasks, db.tasks.c.id == db.run_tasks.c.task_id)
                 .where(db.run_tasks.c.run_id == identifier),
             )
+            run["summary"] = self.run_summary(run, run["works"], run["tasks"])
             return run
+
+    @staticmethod
+    def run_summary(run, works, tasks):
+        return {
+            "discovered": len(run["candidates"] or []),
+            "created_tasks": sum(task["created"] for task in tasks),
+            "reused_tasks": sum(not task["created"] for task in tasks),
+            "skipped": sum(work["status"].startswith("SKIPPED") for work in works),
+            "failed": sum(work["status"] == "ERROR" for work in works),
+            "error": run["error"],
+        }
+
+    def with_recent_run(self, schedule):
+        with self.database.read() as conn:
+            run = db.one(
+                conn,
+                select(db.runs)
+                .where(db.runs.c.schedule_id == schedule["id"])
+                .order_by(db.runs.c.planned_at.desc())
+                .limit(1),
+            )
+        if not run:
+            return {**schedule, "recent_run": None}
+        detail = self.run_detail(run["id"])
+        return {
+            **schedule,
+            "recent_run": {
+                **{field: run[field] for field in ("id", "planned_at", "status")},
+                **detail["summary"],
+            },
+        }
 
 
 class Scheduler:

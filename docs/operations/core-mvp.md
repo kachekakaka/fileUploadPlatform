@@ -1,6 +1,6 @@
 # Core MVP 本机运行
 
-本文介绍 Windows 本机 Core 的通用运行和 Fake 上传闭环。API 与 Worker 是独立进程，共用本机可靠文件系统上的 SQLite；CLI 的业务操作只走 HTTP。Bilibili 集成的新增配置、账号操作及未验收边界见[Bilibili 操作说明](bilibili.md)。百度网盘、SDK、Dashboard、网页接收、Cron、远程访问和历史库升级尚未实现。Fake 验收证据见[实施结果](../../archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
+本文介绍 Windows 本机 Core 的通用运行和 Fake 上传闭环。API 与 Worker 是独立进程，共用本机可靠文件系统上的 SQLite；CLI 的业务操作只走 HTTP。六页面、统一投稿和空库启动见 [Dashboard 操作说明](dashboard.md)。Bilibili 引擎、账号操作及验收边界见 [Bilibili 操作说明](bilibili.md)。百度网盘、SDK、网页文件接收、Cron、远程访问和历史库升级尚未实现。Fake 验收证据见[实施结果](../../archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
 
 ## 安装与启动
 
@@ -19,7 +19,7 @@ $env:UPLOAD_PLATFORM_DATA_DIR = Join-Path $runtimeRoot 'core-mvp'
 
 另开终端，设置同一个 `UPLOAD_PLATFORM_DATA_DIR`，用同一虚拟环境执行 `python -m upload_platform worker`。安装后的等价入口为 `upload-platform`。第三个终端执行 CLI，例如 `python -m upload_platform doctor`。API/数据库 ready 与 Worker active 分开返回；只有 API 启动时任务可以排队，但不会执行。
 
-server 固定绑定 `127.0.0.1`，禁用代理头解释；不接受浏览器 Origin、Fetch Metadata、转发头或错误 Host。当前没有 Token 或多用户隔离，不支持反向代理及远程主机；来源限制不用于识别恶意本机进程。
+server 固定绑定 `127.0.0.1`，拒绝转发头和错误 Host。CLI 使用本机程序入口，浏览器按 Dashboard 和公开投稿入口各自的规则访问。当前只支持本机使用。来源限制不用于识别恶意本机进程。[Dashboard 与网页接入](dashboard.md#程序和网页投稿)
 
 ## 配置
 

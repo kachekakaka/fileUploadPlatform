@@ -70,8 +70,10 @@ def relative_path(value):
 
 
 @contextmanager
-def open_asset(directory, relative, *, text=False):
+def open_asset(directory, relative, *, text=False, fixed_root=False):
     root = root_path(directory)
+    if fixed_root and root != Path(directory):
+        raise Problem("invalid_path", "已校验的目录位置已改变")
     rel = relative_path(relative)
     candidate = root / rel
     handle = None
@@ -86,10 +88,13 @@ def open_asset(directory, relative, *, text=False):
             import msvcrt
             import win32file
 
-            final = win32file.GetFinalPathNameByHandle(msvcrt.get_osfhandle(handle.fileno()), 0)
+            try:
+                final = win32file.GetFinalPathNameByHandle(msvcrt.get_osfhandle(handle.fileno()), 0)
+            except win32file.error as exc:
+                raise OSError() from exc
             if final.startswith("\\\\?\\UNC\\"):
                 raise OSError()
-            final = Path(final.removeprefix("\\\\?\\")).resolve()
+            final = Path(lexical_root(final.removeprefix("\\\\?\\")))
         else:
             final = candidate.resolve(strict=True)
         if not final.is_relative_to(root):
@@ -108,8 +113,8 @@ def open_asset(directory, relative, *, text=False):
         handle.close()
 
 
-def asset_info(directory, relative):
-    with open_asset(directory, relative) as handle:
+def asset_info(directory, relative, *, fixed_root=False):
+    with open_asset(directory, relative, fixed_root=fixed_root) as handle:
         info = os.fstat(handle.fileno())
         return {
             "relative_path": relative_path(relative),

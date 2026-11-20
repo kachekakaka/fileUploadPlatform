@@ -2,11 +2,13 @@
 
 目标是独立运行的上传应用，提供 REST API、Python SDK、CLI 和 Web Dashboard，首批支持 Bilibili 与百度网盘。
 
-当前已实现 Windows 本机 Core MVP：作品描述与文件引用、REST API、HTTP CLI、独立 Worker、受监督的 Fake Adapter、立即/一次性/每日/每周任务、请求重放与执行恢复。原实施结果见 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)，后续边界修复与补验见[审查修复结果](archive/方案/20261116-Core-MVP审查修复.md#实际结果)。Bilibili 普通入口支持单 P 和多 P 的公开、仅自己可见和空间列表隐藏设置。Fake 回执仍仅为模拟；百度网盘、SDK、Dashboard、网页文件接收和 Cron 尚未实现。[Bilibili 普通入口开启记录](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#普通投稿开放私密和空间列表隐藏) · [Bilibili 操作说明](docs/operations/bilibili.md)
+当前已实现 Windows 本机 Core、Dashboard 六个页面及统一投稿 API。Dashboard 支持独立访问、iframe 接入、本机作品登记、任务操作和每日/每周定时规则，投稿方可按原请求键查回。0.2.0 Windows 联调包和 MuMu 整场自动私密投稿已经实测。相关入口见 [Dashboard 操作说明](docs/operations/dashboard.md)、[0.2.0 交付与验收](archive/方案/20261120-fileUploadPlatform-Dashboard与统一提交实施方案.md#17-归档结论)和 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
+
+Bilibili 普通入口支持单 P 和多 P 的公开、仅自己可见和空间列表隐藏设置。Fake 回执为模拟结果。百度网盘、SDK、网页文件接收和 Cron 仍在后续范围。[Bilibili 普通入口开启记录](archive/方案/20261116-Bilibili集成与自维护方案-v1.2.md#普通投稿开放私密和空间列表隐藏) · [Bilibili 操作说明](docs/operations/bilibili.md)
 
 ## 按任务查阅
 
-mumu 本机账号页已通过真实 B 站扫码登录验收，重开控制台还能找回同一次登录。B18 的公开单 P 和多 P 均已过审，并通过创作中心核对与播放验证。多 P 首次传输失败，已在受控补测中通过。私密单 P 已验证投稿账号可播放，未登录与其他账号无法观看。[公开试投记录](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#238-b18-公开试投记录) · [多 P 补测](docs/方案/20261116-Bilibili集成与自维护方案-v1.2.md#2310-b18-多-p-补测) · [私密试投验收](archive/方案/20261119-B18仅自己可见验收.md) · [扫码验收记录](docs/方案/20261117-mumu界面扫码登录接入方案.md#14-本机真实扫码验收)
+mumu 本机账号页已通过真实 B 站扫码登录验收，重开控制台还能找回同一次登录。B18 的公开单 P 和多 P 均已过审，并通过创作中心核对与播放验证。多 P 首次传输失败，已在受控补测中通过。私密单 P 已验证投稿账号可播放，未登录与其他账号无法观看。[公开试投记录](archive/方案/20261116-Bilibili集成与自维护方案-v1.2.md#238-b18-公开试投记录) · [多 P 补测](archive/方案/20261116-Bilibili集成与自维护方案-v1.2.md#2310-b18-多-p-补测) · [私密试投验收](archive/方案/20261119-B18仅自己可见验收.md) · [扫码验收记录](archive/方案/20261117-mumu界面扫码登录接入方案.md#14-本机真实扫码验收)
 
 | 需要处理的事情 | 当前入口 |
 | --- | --- |

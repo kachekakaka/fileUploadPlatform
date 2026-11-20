@@ -1,13 +1,34 @@
 """Independent protocol fixture. Never imports adapter code or calls Bilibili."""
 
 import argparse
+import base64
 import json
 import os
 from pathlib import Path
 import sys
 import time
+from uuid import uuid4
+import zlib
+import struct
 
 BUILD = "core-protocol-v1-fixture"
+
+
+def simulated_png():
+    def chunk(name, content):
+        return (
+            struct.pack(">I", len(content))
+            + name
+            + content
+            + struct.pack(">I", zlib.crc32(name + content))
+        )
+
+    return base64.b64encode(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 2, 2, 8, 0, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00\x00\xff"))
+        + chunk(b"IEND", b"")
+    ).decode("ascii")
 
 
 def save(path, value):
@@ -42,6 +63,25 @@ def main():
             "protocol_version": 1,
             "engine_build_id": BUILD,
         }
+        if req.get("interaction_mode") == "machine":
+            print(
+                json.dumps(
+                    {
+                        **result,
+                        "type": "login_qr_ready",
+                        "interaction_version": 1,
+                        "seq": 1,
+                        "challenge_id": str(uuid4()),
+                        "png_base64": simulated_png(),
+                        "expiry_source": "local",
+                        "deadline_at": int(time.time()) + 30,
+                    }
+                ),
+                flush=True,
+            )
+            gate = Path(control["qr_gate"])
+            while not gate.exists():
+                time.sleep(0.05)
         if args.operation == "query":
             if control.get("query_gate"):
                 Path(req["result_path"]).with_name("query-started").touch()

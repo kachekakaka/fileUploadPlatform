@@ -30,7 +30,11 @@ def execute(supervisor, original):
             ):
                 raise Problem("engine_incompatible", "选定引擎不可用")
             for asset in task["snapshot"]["assets"]:
-                asset_info(task["snapshot"]["directory"], asset["relative_path"])
+                asset_info(
+                    task["snapshot"]["directory"],
+                    asset["relative_path"],
+                    fixed_root="config_version" in task["snapshot"],
+                )
             with store.database.read() as conn:
                 account = db.get(conn, db.accounts, task["account_id"])
             directory = config.data_dir / "executions" / original["id"]

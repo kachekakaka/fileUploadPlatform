@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 import json
 import os
 from pathlib import Path
@@ -59,6 +59,13 @@ def launch(bundle, role, env, log, database):
     import win32con
     import win32job
 
+    # Own the packaged Python process directly. A pwsh launcher can leave the API
+    # alive outside the fixture job when invoked from a remote terminal session.
+    role_env = dict(
+        env,
+        UPLOAD_PLATFORM_DATA_DIR=str(database),
+        UPLOAD_PLATFORM_DASHBOARD_DIR=str(bundle / "dashboard"),
+    )
     job = win32job.CreateJobObject(None, "")
     limits = win32job.QueryInformationJobObject(job, win32job.JobObjectExtendedLimitInformation)
     limits["BasicLimitInformation"]["LimitFlags"] |= win32job.JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
@@ -66,18 +73,9 @@ def launch(bundle, role, env, log, database):
     try:
         with log.open("wb") as stream:
             process = subprocess.Popen(
-                [
-                    "pwsh",
-                    "-NoProfile",
-                    "-NonInteractive",
-                    "-File",
-                    "Start.ps1",
-                    role,
-                    "-DataDirectory",
-                    str(database),
-                ],
+                [str(bundle / "runtime/python.exe"), "-m", "upload_platform", role],
                 cwd=bundle,
-                env=env,
+                env=role_env,
                 stdout=stream,
                 stderr=subprocess.STDOUT,
                 creationflags=subprocess.CREATE_NO_WINDOW,
@@ -97,6 +95,14 @@ def launch(bundle, role, env, log, database):
                 if process.poll() is None:
                     process.terminate()
                 process.wait(timeout=15)
+
+                def job_is_empty():
+                    info = win32job.QueryInformationJobObject(
+                        job, win32job.JobObjectBasicAccountingInformation
+                    )
+                    return info["ActiveProcesses"] == 0
+
+                wait_until(job_is_empty, timeout=15)
     finally:
         job.Close()
 
@@ -200,7 +206,9 @@ def test_unpacked_zip_with_real_mumu_client(tmp_path, monkeypatch):
     fresh = tmp_path / "fresh-data"
 
     def counts(directory):
-        with sqlite3.connect((directory / "core.sqlite3").as_uri() + "?mode=ro", uri=True) as conn:
+        with closing(
+            sqlite3.connect((directory / "core.sqlite3").as_uri() + "?mode=ro", uri=True)
+        ) as conn:
             return [
                 conn.execute(f"SELECT count(*) FROM {table}").fetchone()[0]
                 for table in ("upload_works", "tasks", "submission_ledger")
@@ -210,6 +218,7 @@ def test_unpacked_zip_with_real_mumu_client(tmp_path, monkeypatch):
         base_url=ORIGIN + "/api/v1",
         trust_env=False,
         timeout=3,
+        limits=httpx.Limits(max_keepalive_connections=0),
         headers={"X-Upload-Platform-Client": "cli-v1"},
     ) as http:
 
@@ -324,7 +333,20 @@ def test_unpacked_zip_with_real_mumu_client(tmp_path, monkeypatch):
                 assert counts(data) == [1, 1, 1]
 
         with launch(bundle, "server", env, tmp_path / "new-database.log", fresh):
-            new = wait_until(health)["deployment_id"]
+
+            def fresh_health():
+                file = fresh / "core.sqlite3"
+                if not file.is_file():
+                    return None
+                try:
+                    with closing(sqlite3.connect(file.as_uri() + "?mode=ro", uri=True)) as conn:
+                        row = conn.execute("SELECT deployment_id FROM schema_version").fetchone()
+                except sqlite3.DatabaseError:
+                    return None
+                state = health()
+                return state if row and state and state["deployment_id"] == row[0] else None
+
+            new = wait_until(fresh_health)["deployment_id"]
             assert new != deployment
             reply = http.get(
                 "/submissions/result",

@@ -6,7 +6,7 @@ mumu 本机账号页已通过真实扫码登录验收。当前构建支持只读
 
 引擎源码独立保存在私有仓库 [bilibili-upload-engine](https://github.com/kachekakaka/bilibili-upload-engine)。构建 `cargo build --locked -p bilibili-upload-engine`，固定一个版本目录放置 EXE 和其 `capabilities` 原始输出。生产构建不含 `protocol-fixture` feature；测试构建不得用于真实账号。运行中不替换该目录内 EXE，更新使用新版本目录并核对排队快照兼容性。
 
-沿用[Core 安装说明](core-mvp.md#安装与启动)。本版本数据库 schema 为 2，只接受空库或完全匹配的本版本库；旧版库在只读检查阶段拒绝，不迁移或修改其 journal。新建独立 Core 数据目录，保留旧库原样。
+沿用[Core 安装说明](core-mvp.md#安装与启动)和[当前数据库结构定义](../../src/upload_platform/infrastructure/database.py)。服务只接受空库或完全匹配的本版本库，旧库在只读检查阶段拒绝。含正式引擎的 MuMu 便携候选由启动器生成部署配置，分角色手动启动时用下述 JSON。[便携版启动说明](dashboard.md#mumu-便携版候选)
 
 `UPLOAD_PLATFORM_BILIBILI_CONFIG` 指向仓外 JSON 文件，内容如下（全部换为自己的绝对路径）：
 

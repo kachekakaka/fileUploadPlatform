@@ -8,6 +8,12 @@ Windows x64 ZIP 包含后端、Python 和已构建的 Dashboard。解压后使�
 
 从源码制作同样的包，在仓库根目录使用 PowerShell 7 执行 `pwsh -NoProfile -File tools/build_windows_zip.ps1 -OutputDirectory <仓外输出目录>`。验证命令见 [测试运行入口](../../tests/README.md#windows-联调包验收)。
 
+### MuMu 便携版候选
+
+含 `release.json` 的 MuMu 便携候选 ZIP 将正式引擎一同解压。Windows 默认路径长度下，请选择较短的新目录，给包内依赖许可的多层文件夹留出空间。双击 `启动上传平台.cmd`，首次选择 MuMu 正在使用的录像输出目录及独立数据目录。看到「MuMu 可以连接」后，用同机地址 `http://127.0.0.1:8765`。关闭窗口后后台运行，点窗口内「退出上传平台」才开始等待 Worker 和 API 收尾。数据库、引擎私有状态和日志位于数据目录。具体通过项与未覆盖项按候选包记录。[便携方案与结果](../方案/20261121-MuMu用Windows便携版实施方案.md)
+
+构建候选包时，在同一脚本另传 `-EngineDirectory`、`-EngineNoticesDirectory`、`-EngineBuildId`、`-EngineSourceRevision` 和 `-MuMuSourceRevision`。两个源码版本参数传完整提交号。候选 ZIP 的命名带便携版本后缀。[便携验包入口](../../tests/README.md#mumu-便携版验收)
+
 ## 从源码构建与启动
 
 使用 PowerShell 7，在仓库根目录执行。Python 环境见 [Core 安装说明](core-mvp.md#安装与启动)。前端构建验证使用 Node.js 24.18.0。

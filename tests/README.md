@@ -101,7 +101,18 @@ $env:UPLOAD_PLATFORM_TEST_MUMU = '<MuMu 仓库的绝对路径>'
 python -m pytest tests/e2e/test_windows_package.py -q -s
 ```
 
-用例负责解压、通过包内启动脚本运行 API 和 Worker，并使用 MuMu 的 `UploadPlatform` 客户端、清单生成器与两段合成素材。测试执行器只产生模拟投稿。首次受理后丢弃 HTTP 回执，核对同库重启、原键查回和原请求重放，以及不同数据库的 409。浏览器回执恢复独立由 `tests/e2e/test_dashboard.py` 覆盖。
+用例解压后用包内 Python 直接运行 API 与 Worker，将进程纳入测试的 Windows Job，并使用 MuMu 的 `UploadPlatform` 客户端、清单生成器与两段合成素材。测试执行器只产生模拟投稿。首次受理后丢弃 HTTP 回执，核对同库重启、原键查回和原请求重放。换新库时用新库中的部署编号确认 API 已切换，再检查旧部署的请求返回 409。浏览器回执恢复由 `tests/e2e/test_dashboard.py` 覆盖。
+
+### MuMu 便携版验收
+
+在有交互桌面的 Windows 测试用户下，用空闲的本机 8765 端口和同一份候选 ZIP。用例在仓外独立解压目录和用户数据目录中验证，双击入口的进程环境只保留 Windows 系统路径。测试文件夹会自动加入中文与空格。Windows 默认路径长度下，从仓外选择较短的 `--basetemp`，留出解压依赖许可目录的空间。候选 ZIP 同时可用于上一节的 MuMu 客户端隔离验包。
+
+```powershell
+$env:UPLOAD_PLATFORM_TEST_PORTABLE_ZIP = '<Windows 便携 ZIP 的绝对路径>'
+python -m pytest tests/e2e/test_windows_portable.py -q -s --basetemp '<较短的新仓外目录>'
+```
+
+故障夹具覆盖端口已被占用、引擎能力文件缺失或不符、Worker 启动失败、旧库和原库缺失。本用例与真实投稿、B 站传输异常分别记结果。[实机通过条件](../docs/方案/20261121-MuMu用Windows便携版实施方案.md)
 
 ## 界面扫码接口验证
 

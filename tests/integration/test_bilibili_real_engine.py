@@ -171,8 +171,15 @@ def post(api, path, body, key=None):
         (False, True, False, "public"),
     ],
     ids=[
-        "single-public", "single-hidden", "single-private", "single-private-hidden",
-        "multi-public", "multi-hidden", "multi-private", "multi-private-hidden", "p2-complete",
+        "single-public",
+        "single-hidden",
+        "single-private",
+        "single-private-hidden",
+        "multi-public",
+        "multi-hidden",
+        "multi-private",
+        "multi-private-hidden",
+        "p2-complete",
     ],
 )
 def test_real_core_and_rust_login_upload_query_contract(
@@ -180,7 +187,9 @@ def test_real_core_and_rust_login_upload_query_contract(
 ):
     service, server = real_bilibili
     config = service.database.config
-    deployment = replace(config.bilibili, allow_self_only=mode == "self_only", allow_hide_in_space=hide)
+    deployment = replace(
+        config.bilibili, allow_self_only=mode == "self_only", allow_hide_in_space=hide
+    )
     capabilities = deployment.capabilities()
     capabilities.update(verified_publish_modes=["public"], verified_hide_in_space=False)
     deployment.capabilities_file.write_text(json.dumps(capabilities), encoding="utf-8")
@@ -276,7 +285,14 @@ def test_real_core_and_rust_login_upload_query_contract(
     ],
 )
 def test_ordinary_posting_checks_capabilities_at_each_stage(
-    real_bilibili, ordinary_api, bilibili_work, monkeypatch, options, permissions, disabled, error_code
+    real_bilibili,
+    ordinary_api,
+    bilibili_work,
+    monkeypatch,
+    options,
+    permissions,
+    disabled,
+    error_code,
 ):
     service, (_, platform, _) = real_bilibili
     database = service.database
@@ -540,6 +556,74 @@ def test_ordinary_posting_response_loss_recovers_without_reposting(
         ),
         encoding="utf-8",
     )
+
+
+@pytest.mark.parametrize(("disconnects", "budget"), [(1, 2), (99, 2), (99, 1)])
+def test_three_part_p2_disconnect_only_retries_before_submission(
+    real_bilibili, ordinary_api, bilibili_work, disconnects, budget
+):
+    service, (_, receiver, _) = real_bilibili
+    directory, manifest = bilibili_work(publish_mode="self_only")
+    (directory / "third.mp4").write_bytes(b"distinct third part")
+    manifest["assets"]["videos"].append(
+        {"id": "v3", "path": "third.mp4", "metadata": {"title": "第三 P"}}
+    )
+    manifest["upload_units"][0]["videos"].append("v3")
+    save_manifest(directory, manifest)
+    assert (
+        post(
+            ordinary_api, "/works", {"directory": str(directory), "manifest": manifest}
+        ).status_code
+        == 201
+    )
+    route = f"/works/{manifest['work']['id']}/submit"
+    response = post(
+        ordinary_api,
+        route,
+        {
+            "retry_policy": {
+                "max_attempts": budget,
+                "retry_delays_seconds": [0] * (budget - 1),
+            }
+        },
+    )
+    assert response.status_code == 201, response.text
+    task_id = response.json()["tasks"][0]["task_id"]
+
+    class Disconnect(dict):
+        def __getitem__(self, name):
+            if name == "status":
+                # The fixture has read this chunk. Drop that socket before writing any reply.
+                raise ConnectionResetError("expected loopback P2 interruption")
+            return super().__getitem__(name)
+
+    fault = Disconnect(path="/bucket/key2.mp4", step="chunk", remaining=disconnects)
+    receiver["bucket_fault"] = fault
+    store = ExecutionStore(service.database)
+    store.register()
+    first = store.claim()
+    assert first["task_id"] == task_id
+    Supervisor(store).execute(first)
+    current = service.task(task_id)
+    assert fault["remaining"] < disconnects
+    if disconnects > 1:
+        assert not receiver["submissions"]
+        assert current["attempt_count"] == 1
+        assert current["attempt"]["exit_confirmed"]
+        assert current["attempt"]["result"]["submission_state"] == "not_submitted"
+        if budget == 1:
+            assert current["status"] == "FAILED" and store.claim() is None
+            return
+        second = store.claim()
+        assert second["task_id"] == task_id and second["id"] != first["id"]
+        Supervisor(store).execute(second)
+        current = service.task(task_id)
+    assert current["status"] == "SUCCEEDED"
+    assert current["attempt_count"] == (1 if disconnects == 1 else 2)
+    [posted] = receiver["submissions"]
+    assert posted["is_only_self"] == 1
+    assert [video["title"] for video in posted["videos"]] == ["第一 P", "第二 P", "第三 P"]
+    assert store.claim() is None
 
 
 def test_version_mismatch_cannot_replace_active_engine_or_start_old_snapshot(

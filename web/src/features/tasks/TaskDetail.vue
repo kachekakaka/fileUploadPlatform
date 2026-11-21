@@ -31,6 +31,13 @@ const categories = [{ path: 'attempts', label: '执行尝试' }, { path: 'querie
   { path: 'resolutions', label: '人工核验' }]
 const operations: Record<string, string> = { cancel: '取消任务', resubmit: '重新提交', query: '远端查询', resolve: '人工核验' }
 const resultComponent = computed(() => task.value && registry[task.value.snapshot.target.platform]?.result)
+const needsBilibiliVerification = computed(() => {
+  const detail = task.value
+  if (detail?.status !== 'UNCERTAIN' || detail.snapshot.target.platform !== 'bilibili') return false
+  const attempt = detail.attempt
+  const history = attempt?.result?.history ?? Object.values(attempt?.execution?.observed_events ?? {})
+  return history.some(event => event.phase === 'submit_response' && event.details?.code === 601)
+})
 let stream: EventSource | undefined
 let refreshTimer: ReturnType<typeof setTimeout> | undefined
 let after = 0
@@ -131,7 +138,8 @@ onUnmounted(() => {
   <p v-if="error" class="notice error" role="alert">{{ error }} <ElButton @click="load(true)">重试</ElButton></p>
   <p v-if="disconnected" class="notice" role="status">实时连接已断开，正在通过接口回查并重连</p>
   <template v-if="task">
-    <p v-if="task.status === 'UNCERTAIN'" class="notice">远端结果待核验。请检查原稿件并记录核验依据。</p>
+    <p v-if="needsBilibiliVerification" class="notice">B 站尚未确认收稿，可能需要本人验证。请先查回原任务，避免重复投稿。</p>
+    <p v-else-if="task.status === 'UNCERTAIN'" class="notice">远端结果待核验。请检查原稿件并记录核验依据。</p>
     <section class="panel">
       <h2>任务操作</h2>
       <div class="row">

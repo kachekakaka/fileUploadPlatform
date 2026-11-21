@@ -157,7 +157,8 @@ def main():
             time.sleep(0.01)
     if control.get("crash"):
         os._exit(51)
-    outcome = control.get("outcome", "succeeded")
+    response_code = control.get("submit_response_code")
+    outcome = "uncertain" if response_code is not None else control.get("outcome", "succeeded")
     state = {
         "succeeded": "accepted",
         "retryable": "not_submitted",
@@ -184,7 +185,7 @@ def main():
     record("request_accepted", {})
     record("uploading", {"parts": len(request["parts"])})
     receipt = None
-    if outcome == "succeeded" or control.get("submit_intent"):
+    if outcome == "succeeded" or control.get("submit_intent") or response_code is not None:
         keys = [f"fixture-key-{index}" for index in range(len(request["parts"]))]
         record("waiting_submit", {})
         record(
@@ -194,6 +195,11 @@ def main():
                 "video_keys": keys,
                 "studio": {"videos": [{"filename": key} for key in keys]},
             },
+        )
+    if response_code is not None:
+        record(
+            "submit_response",
+            {"code": response_code, "aid": None, "bvid": None, "video_keys": keys},
         )
     if outcome == "succeeded":
         if archive:

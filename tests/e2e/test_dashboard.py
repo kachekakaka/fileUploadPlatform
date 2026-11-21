@@ -3,12 +3,14 @@ import os
 from pathlib import Path
 import sys
 from threading import Thread
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
 from fastapi.responses import HTMLResponse
 import uvicorn
 
+from helpers.b18_cases import prepare_cases, write_json
 from test_cli_server_worker import Environment, wait_until
 
 
@@ -335,6 +337,80 @@ def test_dashboard_browser_login_fixture(tmp_path):
             assert not context.cookies()
             assert page.url.endswith("/accounts")
             browser.close()
+    finally:
+        environment.close()
+
+
+def test_dashboard_bilibili_601_keeps_the_original_task_uncertain(tmp_path, work_factory):
+    playwright = pytest.importorskip("playwright.sync_api")
+    assert (DIST / "index.html").is_file(), "build web/dist before running the browser test"
+    cases = prepare_cases(tmp_path, work_factory)
+    config = tmp_path / "engine.json"
+    engine = json.loads(config.read_text(encoding="utf-8"))
+    engine.pop("b18_allowlist_file")
+    write_json(config, engine)
+    caps = tmp_path / "capabilities.json"
+    capabilities = json.loads(caps.read_text(encoding="utf-8"))
+    write_json(caps, {**capabilities, "upload_ready": True, "verified_publish_modes": ["public"]})
+    control = tmp_path / "control.json"
+    environment = Environment(tmp_path)
+    environment.env.update(
+        UPLOAD_PLATFORM_BILIBILI_CONFIG=str(config),
+        BUE_FIXTURE_CONTROL=str(control),
+        UPLOAD_PLATFORM_DASHBOARD_DIR=str(DIST),
+    )
+    hint = "B 站尚未确认收稿，可能需要本人验证。请先查回原任务，避免重复投稿。"
+    try:
+        environment.start("server")
+        wait_until(lambda: environment.http.get("/system/health").is_success)
+        assert environment.cli("account", "login")["operation_result"]["status"] == "SUCCEEDED"
+        worker = environment.start("worker")
+        paths = []
+        with playwright.sync_playwright() as runner:
+            browser = runner.chromium.launch(
+                executable_path=os.environ["UPLOAD_PLATFORM_TEST_CHROME"]
+            )
+            page = browser.new_page()
+            for name, code in (("single", 601), ("multi", 602)):
+                case = cases[name]
+                write_json(control, {"submit_response_code": code, "query_failure": True})
+                environment.cli("work", "register", "--dir", case["directory"])
+                response = environment.http.post(
+                    f"/works/{case['work_id']}/submit",
+                    headers={"Idempotency-Key": str(uuid4())},
+                    json={"retry_policy": {"max_attempts": 2, "retry_delays_seconds": [0]}},
+                )
+                response.raise_for_status()
+                path = "/tasks/" + response.json()["tasks"][0]["task_id"]
+                paths.append(path)
+                wait_until(lambda: environment.http.get(path).json()["status"] == "UNCERTAIN")
+                wait_until(
+                    lambda: any(
+                        q["status"] == "FINISHED"
+                        for q in environment.http.get(path + "/queries").json()["items"]
+                    )
+                )
+                page.goto(environment.url + path)
+                playwright.expect(page.locator(".status")).to_have_text("结果待核验")
+                if code == 601:
+                    for reload in (False, True):
+                        if reload:
+                            page.reload()
+                        playwright.expect(page.get_by_text(hint, exact=True)).to_be_visible()
+                    worker.terminate()
+                    worker.wait(timeout=10)
+                    environment.start("worker")
+                else:
+                    playwright.expect(
+                        page.get_by_text("远端结果待核验。", exact=False)
+                    ).to_be_visible()
+                    playwright.expect(page.get_by_text(hint, exact=True)).to_have_count(0)
+            browser.close()
+        for path in paths:
+            task = environment.http.get(path).json()
+            assert task["status"] == "UNCERTAIN" and task["attempt_count"] == 1
+            assert task["receipt"] is None
+        assert len(list((tmp_path / "data/executions").glob("*/fixture-received.json"))) == 2
     finally:
         environment.close()
 

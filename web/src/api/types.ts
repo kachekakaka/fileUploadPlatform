@@ -42,6 +42,9 @@ export interface Snapshot {
   parts: { video_id: string; title: string }[]; assets: { relative_path: string; role: string }[]
   directory: string; manifest?: Manifest; config_version?: string; manifest_path?: string
 }
+interface BilibiliProgress {
+  phase: string; details?: { code?: number } | null
+}
 export interface Task {
   id: string; status: string; work_id: string; account_id: string; snapshot: Snapshot
   version: number; submission_round: number; attempt_count: number; created_at: number
@@ -49,6 +52,10 @@ export interface Task {
   available_actions?: Record<string, { allowed: boolean; reason: string | null }>
   receipt?: Record<string, unknown> | null
   evidence_ref?: string
+  attempt?: {
+    result?: { history?: BilibiliProgress[] } | null
+    execution?: { observed_events?: Record<string, BilibiliProgress> }
+  } | null
 }
 export interface TaskEvent {
   id: string; sequence: number; type: string; created_at: number; payload: Record<string, unknown>

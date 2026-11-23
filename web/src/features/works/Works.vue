@@ -66,7 +66,6 @@ async function choose() {
     if (selected.directory) {
       invalidate()
       directory.value = selected.directory
-      manifestPath.value = ''
     }
   } catch (failure) { formError.value = message(failure) }
   finally { busy.value = false }
@@ -154,7 +153,7 @@ onUnmounted(() => { active = false })
       <div class="row">
         <label class="field field-wide">素材根目录<input v-model="directory" :disabled="busy || !!pending" required
           placeholder="D:\Media\作品" @input="invalidate" /></label>
-        <ElButton :disabled="busy || !!pending" @click="choose">选择作品目录</ElButton>
+        <ElButton :disabled="busy || !!pending" @click="choose">选择素材根目录</ElButton>
       </div>
       <label class="field">配置路径（配置与素材分开时填写）<input v-model="manifestPath"
         :disabled="busy || !!pending" placeholder="留空时读取素材根目录中的 upload.yaml" @input="invalidate" /></label>

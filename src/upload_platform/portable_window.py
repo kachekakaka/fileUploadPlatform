@@ -7,12 +7,9 @@ from queue import Empty, SimpleQueue
 from threading import Thread
 
 from upload_platform.domain.core import Problem
-from upload_platform.infrastructure.directory_picker import DirectoryPicker
 from upload_platform.portable import ADDRESS, Portable
 
 TITLE = "文件上传平台 · MuMu 便携版"
-PICK_RECORDINGS = 101
-PICK_DATA = 102
 START = 103
 STOP = 104
 DASHBOARD = 105
@@ -68,41 +65,20 @@ def show_window(platform):
             publish("failure", f"启动或退出失败（{type(exc).__name__}）。请查看日志位置。")
 
     def input_state():
-        for name in ("recordings", "data", PICK_RECORDINGS, PICK_DATA):
-            gui.EnableWindow(controls[name], not active and platform.settings() is None)
         for name in (START, STOP):
             gui.EnableWindow(controls[name], not active)
 
-    def do_start(*, confirm):
+    def do_start():
         nonlocal active
         settings = platform.settings()
-        recordings, data = (
-            gui.GetWindowText(controls[name]).strip() for name in ("recordings", "data")
-        )
-        if settings is None:
-            if not recordings or not data:
-                notice("请选择录像目录和新的数据目录。")
-                return
-            sessions = Path(recordings) / "sessions"
-            if (
-                not sessions.is_dir()
-                and confirm
-                and gui.MessageBox(
-                    hwnd,
-                    f"首次保存时将创建以下空目录。\n{sessions}\n\n继续保存并启动吗？",
-                    TITLE,
-                    c.MB_OKCANCEL | c.MB_ICONINFORMATION,
-                )
-                != c.IDOK
-            ):
-                return
+        data = Path(settings["data"]) if settings else platform.default_data
         active = True
         input_state()
         gui.EnableWindow(controls[DASHBOARD], False)
-        notice(f"正在检查设置及后台状态。\n日志位置 {Path(data) / 'logs'}")
+        notice(f"正在检查设置及后台状态。\n日志位置 {data / 'logs'}")
 
         def apply():
-            result = platform.start(recordings, data, lambda *values: publish("status", values))
+            result = platform.start(lambda *values: publish("status", values))
             publish("ready", result)
 
         Thread(target=job, args=(apply,)).start()
@@ -115,17 +91,8 @@ def show_window(platform):
         if message == c.WM_COMMAND and not active:
             command = wparam & 0xFFFF
             try:
-                if command in (PICK_RECORDINGS, PICK_DATA):
-                    field = "recordings" if command == PICK_RECORDINGS else "data"
-                    label = (
-                        "MuMu 录像输出目录" if command == PICK_RECORDINGS else "上传平台数据目录"
-                    )
-                    current = Path(gui.GetWindowText(controls[field]) or Path.home())
-                    chosen = DirectoryPicker().choose(current, title=f"选择{label}", owner=hwnd)
-                    if chosen:
-                        gui.SetWindowText(controls[field], chosen)
                 if command == START:
-                    do_start(confirm=True)
+                    do_start()
                 if command == STOP and platform.settings() is not None:
                     active = True
                     input_state()
@@ -201,42 +168,25 @@ def show_window(platform):
         c.CW_USEDEFAULT,
         c.CW_USEDEFAULT,
         720,
-        405,
+        280,
         0,
         0,
         hdr,
         None,
     )
-    initial = platform.settings()
-    for label, name, pick, default, y in (
-        ("MuMu 录像输出目录", "recordings", PICK_RECORDINGS, "", 15),
-        ("上传平台数据目录", "data", PICK_DATA, str(platform.default_data), 75),
-    ):
-        control("STATIC", label, 18, y, 570, 20)
-        controls[name] = control(
-            "EDIT",
-            initial[name] if initial else default,
-            18,
-            y + 22,
-            544,
-            24,
-            style=c.WS_BORDER | c.ES_AUTOHSCROLL | c.WS_TABSTOP,
-        )
-        controls[pick] = control("BUTTON", "选择目录…", 572, y + 21, 111, 26, pick, c.WS_TABSTOP)
-    for y in (153, 180, 207):
+    for y in (20, 48, 76):
         status.append(control("STATIC", "", 18, y, 670, 22))
-    controls["notice"] = control("STATIC", "选择目录后保存并启动。", 18, 239, 670, 72)
+    controls["notice"] = control("STATIC", "", 18, 113, 670, 72)
     for command, title, x, width in (
-        (START, "查看或启动" if initial else "保存并启动", 18, 128),
+        (START, "查看或启动", 18, 128),
         (STOP, "退出上传平台", 156, 132),
         (DASHBOARD, "打开面板", 298, 115),
     ):
-        controls[command] = control("BUTTON", title, x, 317, width, 28, command, c.WS_TABSTOP)
+        controls[command] = control("BUTTON", title, x, 190, width, 28, command, c.WS_TABSTOP)
     gui.EnableWindow(controls[DASHBOARD], False)
     input_state()
     gui.ShowWindow(hwnd, c.SW_SHOW)
-    if initial:
-        do_start(confirm=False)
+    do_start()
     gui.PumpMessages()
 
 

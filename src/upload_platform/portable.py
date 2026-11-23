@@ -168,42 +168,32 @@ class Portable:
             return None
         try:
             data = load_json(self.settings_file)
-            if set(data) != {"recordings", "data", "deployment_id"}:
+            required = {"data", "deployment_id"}
+            if set(data) not in (required, required | {"recordings"}):
                 raise ValueError()
-            for name in ("recordings", "data"):
-                if not isinstance(data[name], str):
-                    raise ValueError()
+            if not isinstance(data["data"], str):
+                raise ValueError()
             if data["deployment_id"] is not None and not is_deployment_id(data["deployment_id"]):
                 raise ValueError()
             return data
         except (OSError, ValueError) as exc:
             raise Problem("portable_settings", f"无法读取便携版设置\n{self.settings_file}") from exc
 
-    def directories(self, settings):
-        recordings = stable_directory(settings["recordings"], exists=True)
-        data = stable_directory(settings["data"], exists=False)
-        if (
-            any(within_either(data, peer) for peer in (recordings, self.bundle))
-            or any(within_either(recordings, peer) for peer in (self.bundle, self.home))
-            or self.home.is_relative_to(data)
-        ):
-            fail("录像、程序和私有数据须使用分开的目录")
-        sessions = stable_directory(recordings / "sessions", exists=False)
-        if sessions.exists() and not sessions.is_dir():
-            fail(f"录像目录的 sessions 不是文件夹\n{sessions}")
+    def data_directory(self, value):
+        data = stable_directory(value, exists=False)
+        if within_either(data, self.bundle) or self.home.is_relative_to(data):
+            fail("程序、启动设置和私有数据须使用分开的目录")
         stable_directory(data / "core", exists=False)
         stable_directory(data / "bilibili-private", exists=False)
         stable_directory(data / "logs", exists=False)
-        return recordings, data, sessions
+        return data
 
-    def configure(self, recordings, data):
-        settings = {"recordings": recordings, "data": data, "deployment_id": None}
-        recordings, data, sessions = self.directories(settings)
+    def configure(self):
+        data = self.data_directory(self.default_data)
         if data.exists() and (not data.is_dir() or any(data.iterdir())):
-            fail(f"首次配置请选择一个新的空数据目录\n{data}")
-        sessions.mkdir(exist_ok=True)
+            fail(f"默认数据目录已有内容，无法确认原部署，请核对便携版设置和原数据库\n{data}")
         data.mkdir(exist_ok=True, parents=True)
-        settings.update(recordings=str(recordings), data=str(data))
+        settings = {"data": str(data), "deployment_id": None}
         save_json(self.settings_file, settings)
         return settings
 
@@ -306,12 +296,12 @@ class Portable:
         owned.append((process, token))
         return process
 
-    def start(self, recordings, data, report):
+    def start(self, report):
         with self.operation():
             settings = self.settings()
             if settings is None:
-                settings = self.configure(recordings, data)
-            recordings, data, sessions = self.directories(settings)
+                settings = self.configure()
+            data = self.data_directory(settings["data"])
             db_file = data / "core/core.sqlite3"
             expected = settings["deployment_id"]
             if expected is not None or db_file.exists():
@@ -352,7 +342,7 @@ class Portable:
             if expected is None:
                 settings["deployment_id"] = deployment
                 save_json(self.settings_file, settings)
-            env = process_env(self.bundle, data, recordings, sessions)
+            env = process_env(self.bundle, data)
             report("正在启动 API", "等待 API 就绪", f"引擎已核对 · {build_id}")
             before = activity_count(db_file)
             owned = []
@@ -469,7 +459,7 @@ def activity_count(file):
         )
 
 
-def process_env(bundle, data, recordings, sessions):
+def process_env(bundle, data):
     return {
         **{
             key: value
@@ -480,8 +470,6 @@ def process_env(bundle, data, recordings, sessions):
         "UPLOAD_PLATFORM_DATA_DIR": str(data / "core"),
         "UPLOAD_PLATFORM_DASHBOARD_DIR": str(bundle / "dashboard"),
         "UPLOAD_PLATFORM_BILIBILI_CONFIG": str(data / "engine.json"),
-        "UPLOAD_PLATFORM_MANIFEST_ROOTS": str(sessions),
-        "UPLOAD_PLATFORM_ASSET_ROOTS": str(recordings),
     }
 
 

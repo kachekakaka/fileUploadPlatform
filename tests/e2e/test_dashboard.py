@@ -27,8 +27,6 @@ def test_dashboard_browser_and_worker(tmp_path, work_factory):
     environment = Environment(tmp_path)
     environment.env.pop("UPLOAD_PLATFORM_BILIBILI_CONFIG", None)
     environment.env.update(
-        UPLOAD_PLATFORM_ASSET_ROOTS=str(tmp_path),
-        UPLOAD_PLATFORM_MANIFEST_ROOTS=str(tmp_path),
         UPLOAD_PLATFORM_DASHBOARD_DIR=str(DIST),
     )
     parent = FastAPI()
@@ -421,8 +419,6 @@ def test_works_recovers_dropped_receipt_after_reload_and_navigation(tmp_path, wo
     environment = Environment(tmp_path)
     environment.env.pop("UPLOAD_PLATFORM_BILIBILI_CONFIG", None)
     environment.env.update(
-        UPLOAD_PLATFORM_MANIFEST_ROOTS=str(tmp_path),
-        UPLOAD_PLATFORM_ASSET_ROOTS=str(tmp_path),
         UPLOAD_PLATFORM_DASHBOARD_DIR=str(DIST),
     )
     fixtures = [work_factory()[0] for _ in range(2)]

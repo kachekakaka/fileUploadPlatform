@@ -164,26 +164,8 @@ def attach_web(app, config, dashboard, submissions):
     def pick_directory(body: Empty, request: Request):
         if not request.state.dashboard:
             raise Problem("forbidden_source", "目录选择必须从面板发起", 403)
-        files = submissions.service.manifest_files
-        common = next(
-            (
-                child
-                for config_root in files.manifest_roots
-                for asset_root in files.asset_roots
-                for child, ancestor in ((config_root, asset_root), (asset_root, config_root))
-                if child.is_relative_to(ancestor)
-            ),
-            None,
-        )
-        if common is None:
-            raise Problem("picker_unavailable", "配置目录和素材目录分开时，请分别输入路径", 409)
-        selected = picker.choose(common)
-        if selected is None:
-            return {"directory": None}
-        directory = local_root(selected)
-        files.within(directory, files.manifest_roots)
-        files.within(directory, files.asset_roots)
-        return {"directory": str(directory)}
+        selected = picker.choose(Path.home())
+        return {"directory": str(local_root(selected)) if selected is not None else None}
 
     @app.post(
         PREFIX + "/dashboard/works",

@@ -95,41 +95,24 @@ def local_root(value):
     return directory
 
 
-class ManifestFiles:
-    def __init__(self, config):
-        self.manifest_roots = tuple(local_root(path) for path in config.manifest_roots)
-        self.asset_roots = tuple(local_root(path) for path in config.asset_roots)
-
-    @staticmethod
-    def within(path, roots):
-        for root in sorted(roots, key=lambda item: len(item.parts), reverse=True):
-            if path.is_relative_to(root):
-                return root
-        raise Problem("invalid_path", "路径超出服务允许的目录")
-
-    def read(self, paths, expected=None):
-        path = Path(paths.manifest_path)
-        if path.name != "upload.yaml":
-            raise Problem("invalid_path", "配置文件名必须是 upload.yaml")
-        config_root = self.within(path, self.manifest_roots)
-        requested_root = Path(paths.asset_root)
-        approved_root = self.within(requested_root, self.asset_roots)
-        asset_root = local_root(requested_root)
-        if not asset_root.is_relative_to(approved_root):
-            raise Problem("invalid_path", "素材根目录越出允许范围")
-        relative = path.relative_to(config_root).as_posix()
-        with open_asset(config_root, relative, fixed_root=True) as handle:
-            content = handle.read(YAML_LIMIT + 1)
-        if len(content) > YAML_LIMIT:
-            raise Problem("invalid_manifest", "配置超过 1 MiB")
-        revision = version(content)
-        if expected is not None and revision != expected:
-            raise Problem("version_conflict", "配置版本已变化，请重新预览或更新预期版本", 409)
-        try:
-            manifest = parse_yaml(content.decode("utf-8-sig"))
-        except UnicodeDecodeError as exc:
-            raise Problem("invalid_manifest", "配置必须使用 UTF-8 编码") from exc
-        return manifest, str(asset_root), revision
+def read_submission_manifest(paths, expected=None):
+    path = Path(paths.manifest_path)
+    if path.name != "upload.yaml":
+        raise Problem("invalid_path", "配置文件名必须是 upload.yaml")
+    manifest_directory = local_root(path.parent)
+    asset_root = local_root(paths.asset_root)
+    with open_asset(manifest_directory, path.name, fixed_root=True) as handle:
+        content = handle.read(YAML_LIMIT + 1)
+    if len(content) > YAML_LIMIT:
+        raise Problem("invalid_manifest", "配置超过 1 MiB")
+    revision = version(content)
+    if expected is not None and revision != expected:
+        raise Problem("version_conflict", "配置版本已变化，请重新预览或更新预期版本", 409)
+    try:
+        manifest = parse_yaml(content.decode("utf-8-sig"))
+    except UnicodeDecodeError as exc:
+        raise Problem("invalid_manifest", "配置必须使用 UTF-8 编码") from exc
+    return manifest, str(asset_root), revision
 
 
 class UnifiedSubmissions:
@@ -139,7 +122,7 @@ class UnifiedSubmissions:
         self.previews = OrderedDict()
 
     def prepare(self, paths, expected=None):
-        manifest, root, revision = self.service.manifest_files.read(paths, expected)
+        manifest, root, revision = read_submission_manifest(paths, expected)
         prepared = self.service.prepare_work(root, manifest, fixed_root=True)
         if not prepared["expanded"]:
             raise Problem("no_targets", "没有启用的上传目标")

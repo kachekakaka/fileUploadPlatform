@@ -114,6 +114,15 @@ python -m pytest tests/e2e/test_windows_portable.py -q -s --basetemp '<较短的
 
 故障夹具覆盖端口已被占用、引擎能力文件缺失或不符、Worker 启动失败、旧库和原库缺失。本用例与真实投稿、B 站传输异常分别记结果。[实机通过条件](../docs/方案/20261121-MuMu用Windows便携版实施方案.md)
 
+按任务读取文件的端到端用例还需要同一版本的 MuMu 实际控制台、已构建前端、测试台账辅助代码与 FFmpeg。请留空本机 8000 和 8765 端口。若 MuMu 的交付目录没有 `tests/`，通过 `UPLOAD_PLATFORM_TEST_MUMU_HELPERS` 指定单独保存的辅助文件目录。若在仓外构建了同一版本的控制台，可用 `UPLOAD_PLATFORM_TEST_MUMU_WEB` 指定其 `dist` 目录。
+
+```powershell
+$env:UPLOAD_PLATFORM_TEST_FFMPEG = '<FFmpeg 可执行文件的绝对路径>'
+python -m pytest tests/integration/test_unified_submissions.py tests/e2e/test_windows_task_files.py -q -s
+```
+
+受控接收端完整接收两段可解码 MP4，按颜色区分手动和自动任务。用例跨 API 重启，在同一任务遇到一次 HTTP 503 后重试，同时用 Chrome 从两条 MuMu 切片打开原任务，并从新网页来源投稿。[按任务读取验收](../archive/方案/20261122-按任务读取投稿清单和素材.md#台式机成品验收)
+
 ## 界面扫码接口验证
 
 Core/引擎联调仍使用上面的两个 `BUE_*` 环境变量，必须为支持 `login_interaction.version=1` 的实际 fixture 引擎。运行以下命令，覆盖 PNG/白名单 API、幂等、取消、账号互斥、真实 SQLite 提交失败、旧凭据恢复及 API 进程实际退出后的恢复；不依赖 mumu 或 Worker。

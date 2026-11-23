@@ -12,7 +12,7 @@ from upload_platform.application.contracts import (
     SchedulePatch,
 )
 from upload_platform.application.manifest import validate_manifest
-from upload_platform.application.submissions import ManifestFiles, SubmissionPaths
+from upload_platform.application.submissions import SubmissionPaths, read_submission_manifest
 from upload_platform.domain.core import (
     Problem,
     uid,
@@ -70,7 +70,6 @@ class Service:
     def __init__(self, database, clock=now, fault=None):
         self.database, self.clock = database, clock
         self.fault = fault or (lambda point: None)
-        self.manifest_files = ManifestFiles(database.config)
 
     @staticmethod
     def receipt_record(conn, scope, key):
@@ -443,7 +442,7 @@ class Service:
             prepared = self.prepare_work(directory, request.manifest)
         elif work["manifest_path"]:
             paths = SubmissionPaths(manifest_path=work["manifest_path"], asset_root=directory)
-            manifest, directory, revision = self.manifest_files.read(paths)
+            manifest, directory, revision = read_submission_manifest(paths)
             prepared = self.prepare_work(directory, manifest, fixed_root=True)
             prepared.update(
                 manifest_path=paths.manifest_path, config_version=revision, source=work["source"]

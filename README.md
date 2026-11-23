@@ -4,7 +4,7 @@
 
 当前已实现 Windows 本机 Core、Dashboard 六个页面及统一投稿 API。Dashboard 支持独立访问、iframe 接入、本机作品登记、任务操作和每日/每周定时规则，投稿方可按原请求键查回。0.2.0 Windows 联调包和 MuMu 整场自动私密投稿已经实测。相关入口见 [Dashboard 操作说明](docs/operations/dashboard.md)、[0.2.0 交付与验收](archive/方案/20261120-fileUploadPlatform-Dashboard与统一提交实施方案.md#17-归档结论)和 [Core MVP 方案](archive/方案/20261116-Core-MVP实施方案.md#产品实施结果)。
 
-MuMu 用 Windows x64 便携候选支持解压后双击启动，内置 Dashboard 和正式 B 站引擎。真实多 P 投稿与断线验收按候选包记录。[便携版启动](docs/operations/dashboard.md#mumu-便携版候选) · [实施与验证记录](docs/方案/20261121-MuMu用Windows便携版实施方案.md#2026-11-21-实施与验证记录)
+MuMu 用 Windows x64 便携版支持解压后双击启动，内置 Dashboard 和正式 B 站引擎。调用方按每笔任务指定清单和素材，启动时无需提供录像目录。[便携版启动](docs/operations/dashboard.md#mumu-便携版候选) · [按任务读取验收](archive/方案/20261122-按任务读取投稿清单和素材.md#台式机成品验收) · [首版真实多 P 与断线验证](docs/方案/20261121-MuMu用Windows便携版实施方案.md#2026-11-21-实施与验证记录)
 
 Bilibili 普通入口支持单 P 和多 P 的公开、仅自己可见和空间列表隐藏设置。Fake 回执为模拟结果。百度网盘、SDK、网页文件接收和 Cron 仍在后续范围。[Bilibili 普通入口开启记录](archive/方案/20261116-Bilibili集成与自维护方案-v1.2.md#普通投稿开放私密和空间列表隐藏) · [Bilibili 操作说明](docs/operations/bilibili.md)
 

@@ -7,11 +7,39 @@ import os
 from pathlib import Path
 import sys
 import time
+from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import ProxyHandler, Request, build_opener
 from uuid import uuid4
 import zlib
 import struct
 
 BUILD = "core-protocol-v1-fixture"
+
+
+def send_parts(receiver, request):
+    url = urlsplit(receiver)
+    assert url.scheme == "http" and url.netloc == f"127.0.0.1:{url.port}" and not url.path
+    opener = build_opener(ProxyHandler({}))
+    root = Path(request["directory"]).resolve(strict=True)
+    for position, part in enumerate(request["parts"], 1):
+        path = (root / part["path"]).resolve(strict=True)
+        assert path.is_relative_to(root)
+        upload = Request(
+            f"{receiver}/{request['identity']['task_id']}/{position}",
+            data=path.read_bytes(),
+            headers={"Content-Type": "video/mp4"},
+            method="PUT",
+        )
+        try:
+            with opener.open(upload, timeout=5) as response:
+                assert response.status == 201
+        except HTTPError as error:
+            if error.code != 503:
+                raise
+            error.close()
+            return False
+    return True
 
 
 def simulated_png():
@@ -159,12 +187,6 @@ def main():
         os._exit(51)
     response_code = control.get("submit_response_code")
     outcome = "uncertain" if response_code is not None else control.get("outcome", "succeeded")
-    state = {
-        "succeeded": "accepted",
-        "retryable": "not_submitted",
-        "permanent": "not_submitted",
-        "uncertain": "unknown",
-    }[outcome]
     history = []
 
     def record(phase, details):
@@ -184,6 +206,15 @@ def main():
 
     record("request_accepted", {})
     record("uploading", {"parts": len(request["parts"])})
+    if outcome == "succeeded" and control.get("media_receiver"):
+        if not send_parts(control["media_receiver"], request):
+            outcome = "retryable"
+    state = {
+        "succeeded": "accepted",
+        "retryable": "not_submitted",
+        "permanent": "not_submitted",
+        "uncertain": "unknown",
+    }[outcome]
     receipt = None
     if outcome == "succeeded" or control.get("submit_intent") or response_code is not None:
         keys = [f"fixture-key-{index}" for index in range(len(request["parts"]))]

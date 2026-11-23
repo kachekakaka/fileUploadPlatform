@@ -10,7 +10,7 @@ Windows x64 ZIP 包含后端、Python 和已构建的 Dashboard。解压后使�
 
 ### MuMu 便携版候选
 
-含 `release.json` 的 MuMu 便携候选 ZIP 将正式引擎一同解压。Windows 默认路径长度下，请选择较短的新目录，给包内依赖许可的多层文件夹留出空间。双击 `启动上传平台.cmd`，首次选择 MuMu 正在使用的录像输出目录及独立数据目录。看到「MuMu 可以连接」后，用同机地址 `http://127.0.0.1:8765`。关闭窗口后后台运行，点窗口内「退出上传平台」才开始等待 Worker 和 API 收尾。数据库、引擎私有状态和日志位于数据目录。具体通过项与未覆盖项按候选包记录。[便携方案与结果](../方案/20261121-MuMu用Windows便携版实施方案.md)
+含 `release.json` 的 MuMu 便携 ZIP 将正式引擎一同解压。Windows 默认路径长度下，请选择较短的新目录，给包内依赖许可的多层文件夹留出空间。双击 `启动上传平台.cmd` 后自动启动。新装使用 `%LOCALAPPDATA%\fileUploadPlatform\MuMu\data` 保存数据库、引擎私有状态和日志。替换旧包前，在旧窗口点「退出上传平台」，等待两个进程退出。解压新包后沿用已保存的数据目录、账号和部署编号，旧录像目录搬走也能启动。看到「MuMu 可以连接」后，用同机地址 `http://127.0.0.1:8765`。关闭窗口后后台继续运行。[首版便携验收](../方案/20261121-MuMu用Windows便携版实施方案.md) · [按任务读取验收](../../archive/方案/20261122-按任务读取投稿清单和素材.md#台式机成品验收)
 
 构建候选包时，在同一脚本另传 `-EngineDirectory`、`-EngineNoticesDirectory`、`-EngineBuildId`、`-EngineSourceRevision` 和 `-MuMuSourceRevision`。两个源码版本参数传完整提交号。候选 ZIP 的命名带便携版本后缀。[便携验包入口](../../tests/README.md#mumu-便携版验收)
 
@@ -24,8 +24,6 @@ npm --prefix web run build
 
 $env:UPLOAD_PLATFORM_API_URL = 'http://127.0.0.1:8765'
 $env:UPLOAD_PLATFORM_DATA_DIR = '<新的仓外运行目录>'
-$env:UPLOAD_PLATFORM_MANIFEST_ROOTS = '<允许读取配置的本机目录>'
-$env:UPLOAD_PLATFORM_ASSET_ROOTS = '<允许引用素材的本机目录>'
 python -m upload_platform server
 ```
 
@@ -35,22 +33,24 @@ python -m upload_platform server
 python -m upload_platform worker
 ```
 
-`UPLOAD_PLATFORM_DATA_DIR` 使用空目录初始化 SQLite 版本 4。旧库保留原处，服务发现旧结构时会拒绝启动。允许目录必须是已存在的本机绝对路径，可用分号列出多个。两项均为空时，统一提交和预览没有可读目录。可用 `UPLOAD_PLATFORM_DASHBOARD_DIR` 指向构建出的 `web/dist`。
+`UPLOAD_PLATFORM_DATA_DIR` 使用空目录初始化上传平台数据库结构版本 4。旧库保留原处，服务发现旧结构时会拒绝启动。可用 `UPLOAD_PLATFORM_DASHBOARD_DIR` 指向构建出的 `web/dist`。
 
 ## 面板操作
 
 - 「概览」显示数据库、平台及 Worker 心跳，以及排队、执行、重试和待核验的任务。
 - 「账号」管理 Bilibili 投稿账号。扫码进行中刷新页面后，会恢复显示活动会话。
-- 「作品」可录入允许的目录并预览 `upload.yaml`。配置与媒体分开时，分别输入配置路径与素材根。「仅登记作品」只保存作品，「提交上传任务」按预览配置受理投稿。等待回执时刷新或离开页面，可回到作品页选择「查回原请求」或「重试原请求」。这依赖同一浏览器配置和可用的本地存储。原生目录选择器需要从当前交互式 Windows 会话启动 API。服务无法显示选择器时可手动输入路径。
+- 「作品」可填写本次素材根目录并预览 `upload.yaml`。如清单独立保存，填入该清单的绝对路径。「仅登记作品」只保存作品，「提交上传任务」按预览配置受理投稿。等待回执时刷新或离开页面，可回到作品页选择「查回原请求」或「重试原请求」。这依赖同一浏览器配置和可用的本地存储。原生目录选择器需要从当前交互式 Windows 会话启动 API。服务无法显示选择器时可手动输入路径。
 - 「任务」支持服务端筛选、事件时间线、回执、取消、重提、远端查询和人工核验。显示的操作随任务状态和平台变化。结果待核验时需要先确认远端结果。
-- 「定时规则」支持每日、每周和启停。最近运行摘要报告作品发现、任务创建、跳过和失败；投稿是否成功见任务详情。
-- 「设置」可查看配置目录、Worker 心跳及引擎诊断。
+- 「定时规则」支持每日、每周和启停。创建时为本规则指定扫描目录。最近运行摘要报告作品发现、任务创建、跳过和失败；投稿是否成功见任务详情。
+- 「设置」可查看平台数据目录、Worker 心跳及引擎诊断。
 
 MuMu 的父页面来源使用 `http://127.0.0.1:8000`，嵌入路径为 `/embed/accounts`、`/embed/works`、`/embed/tasks` 及作品、任务详情。页面首次打开和刷新都直接载入数据。消息格式见[嵌入协议](../../archive/方案/20261120-fileUploadPlatform-Dashboard与统一提交实施方案.md#12-iframe-页面与消息协议)。
 
 ## 程序和网页投稿
 
 请求字段和响应以 [OpenAPI](../../schemas/openapi.json) 为准。配置文件名为 `upload.yaml`，使用 UTF-8，大小最多 1 MiB。自动投稿按原始 YAML 字节计算 `hashlib.blake2b(path.read_bytes(), digest_size=32).hexdigest()`，连同 `manifest_path`、`asset_root` 和 `expected_version` 发送。手动投稿先调用 `POST /api/v1/submissions/preview`，提交时传入返回的 `preview_id`。预览有效期为 10 分钟，重启 API 后可重新预览。
+
+每次预览或自动投稿都提供本机的清单绝对路径和素材根目录。清单可在素材根目录之外，清单中的素材路径一律相对于本次素材根目录，实际打开的普通文件须位于根目录内。平台按任务保存的路径执行和重试，调用方须保留原件直至任务结束。
 
 1. 为本次投稿生成随机 UUIDv4，持久保存键和请求正文。
 2. 将正文通过 JSON 发送到 `POST /api/v1/submissions`，在头部传入 `Idempotency-Key`。

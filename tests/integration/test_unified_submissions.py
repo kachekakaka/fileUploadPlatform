@@ -39,10 +39,9 @@ def setup(tmp_path, config, clock, work_factory):
         dest.parent.mkdir()
         previous.rename(dest)
     yaml_path.write_bytes(yaml.safe_dump(manifest, allow_unicode=True).encode())
-    settings = replace(config, manifest_roots=(config_root,), asset_roots=(media,))
-    database = db.Database(settings)
+    database = db.Database(config)
     service = Service(database, clock)
-    with TestClient(create_app(settings, database, service), base_url=ORIGIN) as client:
+    with TestClient(create_app(config, database, service), base_url=ORIGIN) as client:
         yield client, database, clock, service, yaml_path, media, manifest
 
 
@@ -97,6 +96,8 @@ def test_preview_and_replay_after_yaml_removal_and_expiry(setup):
     task_id = result["task_ids"][0]
     snapshot = client.get("/api/v1/tasks/" + task_id).json()["snapshot"]
     assert snapshot["config_version"] == preview.json()["config_version"]
+    assert Path(snapshot["manifest_path"]) == yaml_path
+    assert Path(snapshot["directory"]) == root
     assert snapshot["manifest"] == preview.json()["manifest"]
     assert [p["relative_path"] for p in snapshot["assets"][:3:2]] == [
         "job-1/video.mp4",
@@ -135,7 +136,7 @@ def test_first_submission_rejects_stale_and_invalid_yaml(setup):
     assert counts(database) == [0, 0, 0]
 
 
-def test_windows_junction_cannot_escape_yaml_or_media_allowlist(setup, tmp_path):
+def test_windows_junction_cannot_escape_requested_media_root(setup, tmp_path):
     client, database, _, _, yaml_path, root, manifest = setup
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -159,14 +160,41 @@ def test_windows_junction_cannot_escape_yaml_or_media_allowlist(setup, tmp_path)
             check=True,
         )
         assert (link / name).is_file()
+    # The caller may name a separate local directory containing the manifest.
     response = client.post(PREVIEW, json=paths(candidates[0][0] / "upload.yaml", root))
-    assert response.status_code == 422 and response.json()["code"] == "invalid_path"
+    assert response.status_code == 200
     response = client.post(PREVIEW, json=paths(yaml_path, candidates[1][0]))
     assert response.status_code == 422 and response.json()["code"] == "invalid_path"
     manifest["assets"]["videos"][0]["path"] = "escape/video.mp4"
     yaml_path.write_bytes(yaml.safe_dump(manifest, allow_unicode=True).encode())
     response = client.post(SUBMIT, json=automatic(yaml_path, root), headers=headers())
     assert response.status_code == 422 and response.json()["code"] == "invalid_path"
+    assert counts(database) == [0, 0, 0]
+
+
+def test_missing_and_unreadable_submission_files(setup):
+    import win32con
+    import win32file
+
+    client, database, _, _, yaml_path, root, manifest = setup
+    body = automatic(yaml_path, root)
+    for file in (yaml_path, root / manifest["assets"]["videos"][0]["path"]):
+        moved = file.with_suffix(".missing")
+        file.rename(moved)
+        try:
+            response = client.post(PREVIEW, json=paths(yaml_path, root))
+            assert (response.status_code, response.json()["code"]) == (422, "invalid_path")
+        finally:
+            moved.rename(file)
+        # A real Windows share lock denies reading to the process serving the request.
+        handle = win32file.CreateFile(
+            str(file), win32con.GENERIC_READ, 0, None, win32con.OPEN_EXISTING, 0, None
+        )
+        try:
+            response = client.post(SUBMIT, json=body, headers=headers())
+            assert (response.status_code, response.json()["code"]) == (422, "invalid_path")
+        finally:
+            handle.Close()
     assert counts(database) == [0, 0, 0]
 
 
@@ -312,14 +340,18 @@ def test_picker_validates_selected_directory_before_returning(tmp_path, config, 
     allowed, outside = tmp_path / "allowed", tmp_path / "outside"
     allowed.mkdir()
     outside.mkdir()
-    settings = replace(config, manifest_roots=(allowed,), asset_roots=(allowed,))
-    database = db.Database(settings)
-    with TestClient(create_app(settings, database), base_url=ORIGIN) as client:
+    database = db.Database(config)
+    with TestClient(create_app(config, database), base_url=ORIGIN) as client:
         browser = {**headers(ORIGIN), "Sec-Fetch-Site": "same-origin"}
         token = client.get("/api/v1/dashboard/session", headers=browser).json()["csrf_token"]
         browser["X-Upload-Platform-CSRF"] = token
         path = "/api/v1/dashboard/pick-directory"
-        for selected, expected in ((None, 200), (str(allowed), 200), (str(outside), 422)):
+        for selected, expected in (
+            (None, 200),
+            (str(allowed), 200),
+            (str(outside), 200),
+            (str(outside / "missing"), 422),
+        ):
             monkeypatch.setattr(DirectoryPicker, "choose", lambda self, start: selected)
             response = client.post(path, headers=browser, json={})
             assert response.status_code == expected
@@ -369,7 +401,7 @@ def test_mumu_generated_single_and_session_yaml_contract(tmp_path, config):
         allow_self_only=True,
     )
     sessions.mkdir()
-    cfg = replace(config, bilibili=engine, manifest_roots=(sessions,), asset_roots=(output,))
+    cfg = replace(config, bilibili=engine)
     database = db.Database(cfg)
     with TestClient(create_app(cfg, database), base_url=ORIGIN) as client:
         with database.transaction() as conn:

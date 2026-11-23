@@ -10,7 +10,10 @@ from zipfile import ZipFile
 import httpx
 import pytest
 
+from conftest import save_manifest
 from test_cli_server_worker import wait_until
+from upload_platform.application.submissions import version
+from upload_platform.portable import save_json
 
 pytestmark = pytest.mark.skipif(
     os.name != "nt" or not os.getenv("UPLOAD_PLATFORM_TEST_PORTABLE_ZIP"),
@@ -37,20 +40,18 @@ def portable_case(tmp_path, monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "用户设置"))
     windir = Path(os.environ["SystemRoot"])
     monkeypatch.setenv("PATH", os.pathsep.join([str(windir / "System32"), str(windir)]))
-    recordings = tmp_path / "录像 原件"
-    recordings.mkdir()
     platform = Portable.for_user(bundle)
-    yield platform, recordings
+    yield platform
     if platform.settings() and platform.settings()["deployment_id"]:
         platform.stop(lambda role: None)
 
 
-def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_factory):
+def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_factory, tmp_path):
     import win32con as c
     import win32gui as gui
 
-    platform, recordings = portable_case
-    (recordings / "sessions").mkdir()
+    platform = portable_case
+    previous_recordings = tmp_path / "已搬走的旧录像"
 
     def children(hwnd, kind):
         found = []
@@ -88,11 +89,10 @@ def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_fac
 
     first = launch()
     try:
-        edits = children(first, "Edit")
-        assert len(edits) == 2
-        gui.SendMessage(edits[0], c.WM_SETTEXT, 0, str(recordings))
-        click(first, 103)
+        assert not children(first, "Edit")
         wait_until(lambda: text(first, "MuMu 可以连接"), timeout=50)
+        assert Path(platform.settings()["data"]) == platform.default_data
+        assert "recordings" not in platform.settings()
         deployment = platform.settings()["deployment_id"]
         server = platform.record("server", deployment)
         worker = platform.record("worker", deployment)
@@ -111,9 +111,11 @@ def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_fac
                 ),
                 timeout=23,
             )
-            directory, manifest = work_factory(
-                directory=recordings / "sessions" / "fixture", duration=8
-            )
+            directory, manifest = work_factory(directory=tmp_path / "本次 媒体", duration=8)
+            config_dir = tmp_path / "单独配置"
+            config_dir.mkdir()
+            save_manifest(config_dir, manifest)
+            config_file = config_dir / "upload.yaml"
             with httpx.Client(base_url="http://127.0.0.1:8765/api/v1", trust_env=False) as client:
 
                 def post(path, body):
@@ -128,9 +130,14 @@ def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_fac
                     assert result.status_code == 201, result.text
                     return result.json()
 
-                work = post("/works", {"directory": str(directory), "manifest": manifest})
-                (task,) = post(f"/works/{work['work_id']}/submit", {})["tasks"]
-                task_id = task["task_id"]
+                (task_id,) = post(
+                    "/submissions",
+                    {
+                        "manifest_path": str(config_file),
+                        "asset_root": str(directory),
+                        "expected_version": version(config_file.read_bytes()),
+                    },
+                )["task_ids"]
                 wait_until(lambda: client.get(f"/tasks/{task_id}").json()["status"] == "RUNNING")
         finally:
             gui.PostMessage(second, c.WM_CLOSE, 0, 0)
@@ -138,9 +145,24 @@ def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_fac
         click(first, 104)
         wait_until(lambda: text(first, "上传平台已退出"), timeout=35)
         assert platform.health(deployment) is None
+        # Exercise replacing an older package with a saved custom data directory.
+        old_data = tmp_path / "旧包的自选 数据"
+        assert platform.default_data.resolve().is_relative_to(tmp_path.resolve())
+        assert old_data.resolve().is_relative_to(tmp_path.resolve())
+        platform.default_data.rename(old_data)
+        save_json(
+            platform.settings_file,
+            {
+                "recordings": str(previous_recordings),
+                "data": str(old_data),
+                "deployment_id": deployment,
+            },
+        )
         click(first, 103)
         wait_until(lambda: text(first, "MuMu 可以连接"), timeout=50)
         assert platform.settings()["deployment_id"] == deployment
+        assert not platform.default_data.exists()
+        assert not previous_recordings.exists()
         assert platform.record("server", deployment)["token"] != server["token"]
         assert platform.record("worker", deployment)["token"] != worker["token"]
         original = platform.diagnostics(f"tasks/{task_id}")
@@ -152,10 +174,10 @@ def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_fac
 def test_startup_faults_preserve_data_and_port_owner(portable_case):
     from upload_platform.domain.core import Problem
 
-    platform, recordings = portable_case
+    platform = portable_case
 
     def start():
-        return platform.start(str(recordings), str(platform.default_data), lambda *_: None)
+        return platform.start(lambda *_: None)
 
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 8765))

@@ -29,8 +29,6 @@ onMounted(load)
         <dt>服务版本</dt><dd>{{ data.version }}</dd>
         <dt>API / 数据库</dt><dd>{{ data.api }} / {{ data.database }}</dd>
         <dt>数据目录</dt><dd>{{ data.data_directory }}</dd>
-        <dt>配置目录</dt><dd>{{ data.manifest_roots.join('、') || '未配置' }}</dd>
-        <dt>素材根目录</dt><dd>{{ data.asset_roots.join('、') || '未配置' }}</dd>
       </dl>
     </section>
     <section class="panel"><h2>Worker 心跳</h2>

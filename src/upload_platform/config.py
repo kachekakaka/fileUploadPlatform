@@ -19,8 +19,6 @@ class Config:
     busy_timeout_ms: int = 5000
     requests_dir: Path | None = None
     bilibili: object | None = None
-    manifest_roots: tuple[Path, ...] = ()
-    asset_roots: tuple[Path, ...] = ()
     dashboard_dir: Path | None = None
 
     def __post_init__(self):
@@ -40,8 +38,6 @@ class Config:
                 raise Problem("configuration", "引擎私有状态目录必须与 Core 数据目录分离")
         if self.requests_dir is not None:
             lexical_root(str(self.requests_dir))
-        for directory in (*self.manifest_roots, *self.asset_roots):
-            lexical_root(str(directory))
         if self.dashboard_dir is not None:
             lexical_root(str(self.dashboard_dir))
         parsed = urlsplit(self.api_url)
@@ -103,9 +99,6 @@ class Config:
                 values[field] = float(value)
         if os.getenv("UPLOAD_PLATFORM_REQUESTS_DIR"):
             values["requests_dir"] = Path(os.environ["UPLOAD_PLATFORM_REQUESTS_DIR"])
-        for field in ("manifest_roots", "asset_roots"):
-            paths = os.getenv("UPLOAD_PLATFORM_" + field.upper(), "")
-            values[field] = tuple(Path(path) for path in paths.split(os.pathsep) if path)
         if os.getenv("UPLOAD_PLATFORM_DASHBOARD_DIR"):
             values["dashboard_dir"] = Path(os.environ["UPLOAD_PLATFORM_DASHBOARD_DIR"])
         if os.getenv("UPLOAD_PLATFORM_BILIBILI_CONFIG"):

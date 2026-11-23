@@ -164,8 +164,6 @@ class Dashboard:
             "api": "ready",
             "database": "ready",
             "data_directory": str(self.config.data_dir),
-            "manifest_roots": [str(p) for p in self.service.manifest_files.manifest_roots],
-            "asset_roots": [str(p) for p in self.service.manifest_files.asset_roots],
             "workers": workers,
             "worker_active": any(worker["active"] for worker in workers),
             "accounts": accounts,

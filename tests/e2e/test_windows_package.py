@@ -132,8 +132,7 @@ def test_unpacked_zip_with_real_mumu_client(tmp_path, monkeypatch):
     assert spec["info"]["version"] == "0.2.0"
 
     output = tmp_path / "合成录像"
-    sessions = output / "sessions"
-    sessions.mkdir(parents=True)
+    output.mkdir()
     clips = []
     for name in ("job-b", "job-a"):
         video = output / name / "000001.mp4"
@@ -196,8 +195,6 @@ def test_unpacked_zip_with_real_mumu_client(tmp_path, monkeypatch):
     env.update(
         BUE_FIXTURE_CONTROL=str(control),
         UPLOAD_PLATFORM_BILIBILI_CONFIG=str(config),
-        UPLOAD_PLATFORM_MANIFEST_ROOTS=str(sessions),
-        UPLOAD_PLATFORM_ASSET_ROOTS=str(output),
         UPLOAD_PLATFORM_HEARTBEAT_SECONDS="1",
         UPLOAD_PLATFORM_LEASE_SECONDS="8",
         UPLOAD_PLATFORM_POLL_SECONDS="0.1",
@@ -269,6 +266,10 @@ def test_unpacked_zip_with_real_mumu_client(tmp_path, monkeypatch):
                     },
                 )
                 path, revision = save_manifest(output, work_id, manifest)
+                detached = tmp_path / "独立清单" / "upload.yaml"
+                detached.parent.mkdir()
+                Path(path).rename(detached)
+                path = str(detached)
                 preview = asyncio.run(
                     client.preview(
                         deployment,

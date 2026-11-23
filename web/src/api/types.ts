@@ -62,7 +62,6 @@ export interface TaskEvent {
 }
 export interface Overview {
   version: string; api: string; database: string; data_directory: string
-  manifest_roots: string[]; asset_roots: string[]
   workers: { id: string; pid: number; heartbeat_at: number; active: boolean }[]
   worker_active: boolean; accounts: number; terminal_tasks: number
   task_counts: Record<string, number>; recent_tasks: Task[]; incidents: Task[]

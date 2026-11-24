@@ -5,6 +5,7 @@ import 'element-plus/es/components/button/style/css'
 import App from './App.vue'
 import './styles.css'
 import { startEmbed } from '../embed/protocol'
+import { embeddedDeployment } from '../api/client'
 
 const overview = () => import('../features/overview/Overview.vue')
 const accounts = () => import('../features/accounts/Accounts.vue')
@@ -33,6 +34,11 @@ const router = createRouter({
     { path: '/embed/tasks/:id', component: task },
   ],
   scrollBehavior: () => ({ top: 0 }),
+})
+router.beforeEach(to => {
+  if (embeddedDeployment && to.path.startsWith('/embed/') && to.query.deployment !== embeddedDeployment) {
+    return { path: to.path, query: { ...to.query, deployment: embeddedDeployment }, hash: to.hash, replace: true }
+  }
 })
 createApp(App).component('ElButton', ElButton).use(router).mount('#app')
 void startEmbed(router)

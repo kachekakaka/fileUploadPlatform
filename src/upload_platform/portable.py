@@ -182,7 +182,7 @@ class Portable:
     def data_directory(self, value):
         data = stable_directory(value, exists=False)
         if within_either(data, self.bundle) or self.home.is_relative_to(data):
-            fail("程序、启动设置和私有数据须使用分开的目录")
+            fail(f"程序、启动设置和私有数据须使用分开的目录\n{data}")
         stable_directory(data / "core", exists=False)
         stable_directory(data / "bilibili-private", exists=False)
         stable_directory(data / "logs", exists=False)
@@ -218,7 +218,7 @@ class Portable:
     def record_path(self, role):
         return self.home / f"{role}.json"
 
-    def record(self, role, deployment):
+    def record(self, role, deployment, data=None):
         path = self.record_path(role)
         if not path.exists():
             return None
@@ -228,7 +228,9 @@ class Portable:
         if not live_process(value):
             return None
         if value["deployment_id"] != deployment or value["role"] != role:
-            fail(f"后台 {role} 正在使用其他部署")
+            fail(f"后台 {role} 正在使用其他部署\n当前数据目录：{value.get('data', '未知')}\n请求目录：{data}")
+        if data is not None and value.get("data") != str(data):
+            fail(f"后台 {role} 的数据目录不符\n当前数据目录：{value.get('data', '未知')}\n请求目录：{data}")
         if not re.fullmatch(r"[0-9a-f]{32}", value["token"]):
             fail(f"后台进程记录无效\n{path}")
         return value
@@ -296,31 +298,39 @@ class Portable:
         owned.append((process, token))
         return process
 
-    def start(self, report):
+    def start(self, report, *, data_dir=None, expected_deployment=None):
         with self.operation():
-            settings = self.settings()
-            if settings is None:
-                settings = self.configure()
+            if data_dir is None:
+                settings = self.settings() or self.configure()
+            else:
+                settings = {"data": str(data_dir), "deployment_id": expected_deployment}
             data = self.data_directory(settings["data"])
             db_file = data / "core/core.sqlite3"
             expected = settings["deployment_id"]
+            if (data / "core-v2").exists():
+                fail(f"此目录属于旧上传部署，请使用原上传程序打开\n{data / 'core-v2'}")
             if expected is not None or db_file.exists():
                 deployment = existing_deployment(db_file)
                 if expected is not None and expected != deployment:
                     fail(f"原数据库的部署编号不符\n{db_file}")
             else:
+                if data_dir is not None and data.exists() and (not data.is_dir() or any(data.iterdir())):
+                    fail(f"上传目录已有内容，无法确认原部署\n{data}")
                 deployment = None
             build_id, engine = self.bundle_engine()
-            server = self.record("server", deployment)
-            worker = self.record("worker", deployment)
+            server = self.record("server", deployment, data)
+            worker = self.record("worker", deployment, data)
             for record in (server, worker):
                 if record and Path(record["bundle"]) != self.bundle:
                     fail("后台正在从另一处解压目录运行，请先退出上传平台")
                 if record and self.marker(record["token"]).exists():
                     fail("上传平台正在退出，请稍后再启动")
             if server is None:
-                check_port()
-            (data / "logs").mkdir(exist_ok=True)
+                try:
+                    check_port()
+                except Problem as exc:
+                    fail(f"{exc.message}\n请求目录：{data}")
+            (data / "logs").mkdir(parents=True, exist_ok=True)
             engine_file = data / "engine.json"
             if server is None and worker is None:
                 save_json(
@@ -339,7 +349,7 @@ class Portable:
                     deployment = database.initialize()
                 finally:
                     database.close()
-            if expected is None:
+            if expected is None and data_dir is None:
                 settings["deployment_id"] = deployment
                 save_json(self.settings_file, settings)
             env = process_env(self.bundle, data)
@@ -352,7 +362,7 @@ class Portable:
                     server_process = self.spawn("server", deployment, data, env, owned)
 
                 def server_ready():
-                    role = self.record("server", deployment)
+                    role = self.record("server", deployment, data)
                     if not role or (server_process and role["pid"] != server_process.pid):
                         return None
                     return self.health(deployment)
@@ -378,7 +388,7 @@ class Portable:
                     worker_process = self.spawn("worker", deployment, data, env, owned)
 
                 def worker_ready():
-                    role = self.record("worker", deployment)
+                    role = self.record("worker", deployment, data)
                     health = self.health(deployment)
                     return (
                         role
@@ -402,18 +412,25 @@ class Portable:
                             except subprocess.TimeoutExpired:
                                 break  # Leave any draining process and its dependency running.
                 raise
-            return build_id, platform["available_accounts"], data / "logs"
+            return build_id, platform["available_accounts"], data / "logs", (data, deployment)
 
-    def stop(self, report):
+    def stop(self, report, *, binding):
         with self.operation():
-            settings = self.settings()
-            if settings is None:
-                return
-            deployment = settings["deployment_id"]
-            for role in reversed(ROLES):
-                record = self.record(role, deployment)
+            if binding is None:
+                fail("此窗口尚未核对上传部署，不能退出后台服务")
+            data, deployment = binding
+            records = [self.record(role, deployment, data) for role in reversed(ROLES)]
+            if not any(records):
+                # 已退出的后台记录也可能已被其他工作区接管。
+                for role in ROLES:
+                    path = self.record_path(role)
+                    if path.exists():
+                        value = load_json(path)
+                        if value.get("data") != str(data) or value.get("deployment_id") != deployment:
+                            fail(f"启动记录已指向其他部署\n当前数据目录：{value.get('data', '未知')}")
+            for record in records:
                 if record:
-                    report(role)
+                    report(record["role"])
                     self.marker(record["token"]).touch()
                     while live_process(record):
                         time.sleep(0.25)
@@ -488,6 +505,7 @@ def serve(portable, role, deployment, token):
             "role": role,
             "pid": os.getpid(),
             "bundle": str(portable.bundle),
+            "data": str(config.database.parent.parent),
             "creation_time": process_creation(win32api.GetCurrentProcess()),
             "deployment_id": deployment,
             "token": token,

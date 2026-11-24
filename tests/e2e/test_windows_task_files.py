@@ -44,7 +44,7 @@ def receiver(directory):
 
         def do_PUT(self):
             task, part = self.path.strip("/").split("/")
-            assert task == str(UUID(task)) and part == "1"
+            assert task == str(UUID(task)) and part in {"1", "2"}
             assert self.headers["Content-Type"] == "video/mp4"
             body = self.rfile.read(int(self.headers["Content-Length"]))
             assert body
@@ -52,9 +52,9 @@ def receiver(directory):
                 self.server.rejected.append(task)
                 status = 503
             else:
-                with (directory / f"{task}.mp4").open("xb") as output:
+                with (directory / f"{task}-{part}.mp4").open("xb") as output:
                     output.write(body)
-                self.server.accepted.append(task)
+                self.server.accepted.append((task, int(part)))
                 status = 201
             self.send_response(status)
             self.end_headers()
@@ -152,7 +152,7 @@ def serve_mumu(app):
             assert not thread.is_alive()
 
 
-def verify_browser(playwright, jobs, task_ids, origin, external):
+def verify_browser(playwright, jobs, task_ids, origin, external, deployment):
     with playwright.sync_playwright() as tools:
         browser = tools.chromium.launch(executable_path=os.environ["UPLOAD_PLATFORM_TEST_CHROME"])
         try:
@@ -160,10 +160,14 @@ def verify_browser(playwright, jobs, task_ids, origin, external):
             page = context.new_page()
             for job, task in zip(jobs, task_ids, strict=True):
                 page.goto(f"http://127.0.0.1:8000/segments?job_id={job}")
-                page.get_by_role("button", name="查看任务", exact=True).click()
+                page.get_by_role("row").filter(has_text="001.mp4").get_by_role(
+                    "button", name="查看任务", exact=True
+                ).click()
                 playwright.expect(page).to_have_url(f"http://127.0.0.1:8000/uploads/tasks/{task}")
                 frame = page.locator("iframe")
-                playwright.expect(frame).to_have_attribute("src", f"{ORIGIN}/embed/tasks/{task}")
+                playwright.expect(frame).to_have_attribute(
+                    "src", f"{ORIGIN}/embed/tasks/{task}?deployment={deployment}"
+                )
                 playwright.expect(
                     page.frame_locator("iframe").locator("header .status")
                 ).to_have_text("已成功")
@@ -199,6 +203,7 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
     )
     monkeypatch.syspath_prepend(str(checkout))
     from src.orchestrator.segment_uploads import SegmentUploads
+    from src.orchestrator import recording_archive
     from src.orchestrator.server import Runtime, ServerConfig, create_app
     from src.orchestrator.session_deliveries import SessionDeliveries
     from src.orchestrator.storage import Store
@@ -207,6 +212,7 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
         FIELDS,
         STARTED,
         add_job,
+        capture,
         current,
         finish_clip,
         finish_worker,
@@ -274,16 +280,20 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
     runtime.state = "running"
     ledger = runtime.store = Store(console_dir / "orchestrator.sqlite3")
 
-    def record_sample(target, root, room_id, color):
+    def record_sample(target, root, room_id, colors):
         observed = replace(room(number=room_id), web_rid=f"fixture-{room_id}")
         job = add_job(ledger, target, observed, STARTED - 1)
         assert job
-        clip = root / job / "000001.mp4"
-        start_clip(ledger, job, 1, clip, STARTED)
-        paint(clip, color)
-        finish_clip(ledger, job, 1, clip, STARTED + 2)
+        staged = capture(ledger, job, root)
+        for index, color in enumerate(colors, 1):
+            clip = staged / f"part_{index:06d}.mp4"
+            at = STARTED + 2 * (index - 1)
+            start_clip(ledger, job, index, clip, at)
+            paint(clip, color)
+            finish_clip(ledger, job, index, clip, at + 2)
         ledger.request_stop(job, "manual_stop")
-        finish_worker(ledger, job, STARTED + 3)
+        finish_worker(ledger, job, STARTED + 2 * len(colors) + 1)
+        recording_archive.publish(ledger)
         with ledger.transaction() as connection:
             connection.execute(
                 "UPDATE recording_sessions SET title_step='done' WHERE target_id=?", (target,)
@@ -313,6 +323,7 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
 
             with launch(bundle, "server", env, tmp_path / "first-api.log", data):
                 deployment = wait_until(lambda: http.get("/system/health").json())["deployment_id"]
+                write_json(console_dir / "settings.json", {"upload_deployment": deployment})
                 response = http.post(
                     "/account-login-sessions", json={}, headers={"Idempotency-Key": str(uuid4())}
                 )
@@ -323,7 +334,7 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
 
                 manual = SegmentUploads(runtime, core, first_root)
                 manual_target = ledger.add_target("fixture-manual")
-                first_job = record_sample(manual_target, first_root, "1200", "red")
+                first_job = record_sample(manual_target, first_root, "1200", ("red",))
                 draft = asyncio.run(manual.preview(first_job, 1, deployment, account, FIELDS))
                 first = asyncio.run(manual.confirm(draft["ticket"], True))["task_id"]
 
@@ -338,7 +349,7 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
                         "account": account,
                     },
                 )
-                second_job = record_sample(automatic_target, second_root, "1201", "blue")
+                second_job = record_sample(automatic_target, second_root, "1201", ("blue", "lime"))
                 session = SessionDeliveries(
                     runtime,
                     automatic,
@@ -352,6 +363,10 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
                 second = arrangement["task_id"]
                 assert first and second and first != second
                 assert [task(value)["status"] for value in (first, second)] == ["QUEUED", "QUEUED"]
+                manual_path, automatic_path = (Path(task(value)["snapshot"]["manifest_path"])
+                                               for value in (first, second))
+                assert manual_path == Path(current(ledger, manual_target)["recording_directory"]) / "投稿/001/upload.yaml"
+                assert automatic_path == Path(current(ledger, automatic_target)["recording_directory"]) / "upload.yaml"
                 assert sink.accepted == []
                 sink.retry = second
                 for path in (task(value)["snapshot"]["manifest_path"] for value in (first, second)):
@@ -371,9 +386,9 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
                 assert task(second)["attempt"]["result"]["submission_state"] == "not_submitted"
                 assert wait_until(lambda: task(second)["status"] == "SUCCEEDED", timeout=65)
                 assert [task(value)["attempt_count"] for value in (first, second)] == [1, 2]
-                assert sink.accepted == [first, second] and sink.rejected == [second]
-                for task_id, index in ((first, 0), (second, 2)):
-                    file = downloads / f"{task_id}.mp4"
+                assert sink.accepted == [(first, 1), (second, 1), (second, 2)] and sink.rejected == [second]
+                for task_id, part, index in ((first, 1, 0), (second, 1, 2), (second, 2, 1)):
+                    file = downloads / f"{task_id}-{part}.mp4"
                     assert decodes(file)
                     pixel = subprocess.check_output(
                         [
@@ -409,6 +424,7 @@ def test_task_files_reach_receiver_and_mumu_reads_original_slices(
                             "manifest_path": str(external / "upload.yaml"),
                             "asset_root": str(external),
                         },
+                        deployment,
                     )
                 assert browser_task not in (first, second)
                 wait_until(lambda: task(browser_task)["status"] == "SUCCEEDED")

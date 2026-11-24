@@ -20,6 +20,55 @@ pytestmark = pytest.mark.skipif(
 DIST = Path(__file__).resolve().parents[2] / "web" / "dist"
 
 
+def test_open_embed_keeps_deployment_after_port_takeover(tmp_path, work_factory):
+    playwright = pytest.importorskip("playwright.sync_api")
+    directory, _ = work_factory()
+    environment = Environment(tmp_path)
+    environment.env.pop("UPLOAD_PLATFORM_BILIBILI_CONFIG", None)
+    environment.env["UPLOAD_PLATFORM_DASHBOARD_DIR"] = str(DIST)
+
+    def health(previous=None):
+        response = environment.http.get("/system/health")
+        if response.is_success:
+            value = response.json()["deployment_id"]
+            return value if value != previous else None
+        return None
+
+    first = environment.start("server")
+    try:
+        deployment = wait_until(health)
+        origin = environment.url
+        with playwright.sync_playwright() as runner:
+            browser = runner.chromium.launch(executable_path=os.environ["UPLOAD_PLATFORM_TEST_CHROME"])
+            try:
+                page = browser.new_page()
+                page.goto(origin + "/embed/accounts")
+                playwright.expect(page.get_by_role("alert")).to_contain_text("尚未绑定")
+                works = origin + "/embed/works?deployment=" + deployment
+                page.goto(works)
+                page.get_by_role("button", name="登记本机作品").click()
+                page.get_by_label("素材根目录").fill(str(directory))
+                page.get_by_role("button", name="预览配置").click()
+                playwright.expect(page.get_by_text("合并为多 P 稿件")).to_be_visible()
+                first.terminate()
+                first.wait(timeout=10)
+                environment.env["UPLOAD_PLATFORM_DATA_DIR"] = str(tmp_path / "other")
+                environment.start("server")
+                assert wait_until(lambda: health(deployment)) != deployment
+                page.get_by_role("button", name="提交上传任务").click()
+                playwright.expect(page.get_by_role("alert")).to_contain_text("部署已切换")
+                for name in ("accounts", "tasks", "works"):
+                    page.goto(f"{origin}/embed/{name}?deployment={deployment}")
+                    playwright.expect(page.get_by_role("alert")).to_contain_text("部署已切换")
+                    page.reload()
+                    playwright.expect(page.get_by_role("alert")).to_contain_text("部署已切换")
+                assert environment.http.get("/tasks").json()["items"] == []
+            finally:
+                browser.close()
+    finally:
+        environment.close()
+
+
 def test_dashboard_browser_and_worker(tmp_path, work_factory):
     playwright = pytest.importorskip("playwright.sync_api")
     assert (DIST / "index.html").is_file(), "build web/dist before running the browser test"
@@ -30,6 +79,7 @@ def test_dashboard_browser_and_worker(tmp_path, work_factory):
         UPLOAD_PLATFORM_DASHBOARD_DIR=str(DIST),
     )
     parent = FastAPI()
+    deployment = None
 
     @parent.get("/external", response_class=HTMLResponse)
     def external():
@@ -48,7 +98,7 @@ def test_dashboard_browser_and_worker(tmp_path, work_factory):
           }}
         }});
         </script>
-        <iframe src="{environment.url}/embed/accounts"></iframe>"""
+        <iframe src="{environment.url}/embed/accounts?deployment={deployment}"></iframe>"""
 
     import socket
 
@@ -64,6 +114,7 @@ def test_dashboard_browser_and_worker(tmp_path, work_factory):
     try:
         server_process = environment.start("server")
         wait_until(lambda: environment.http.get("/system/health").is_success)
+        deployment = environment.http.get("/system/health").json()["deployment_id"]
         origin = environment.url
         with playwright.sync_playwright() as runner:
             browser = runner.chromium.launch(

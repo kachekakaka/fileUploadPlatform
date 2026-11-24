@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { get, manage, previewSubmission, receipt, replaySubmission } from '../../api/client'
+import { embeddedDeployment, get, manage, previewSubmission, receipt, replaySubmission } from '../../api/client'
 import type { Page, Preview, Receipt, Work } from '../../api/types'
 import { detailPath } from '../../app/paths'
 import { platformName } from '../../platforms/registry'
@@ -74,13 +74,14 @@ async function prepare() {
   invalidate()
   busy.value = true
   try {
-    const health = await get<{ deployment_id: string }>('/system/health')
-    if (!health.deployment_id) throw new Error('上传平台没有返回可核对的部署编号')
+    const deployment = embedded.value ? embeddedDeployment :
+      (await get<{ deployment_id: string }>('/system/health')).deployment_id
+    if (!deployment) throw new Error('上传平台没有返回可核对的部署编号')
     preview.value = await previewSubmission<Preview>({
       asset_root: directory.value.trim(),
       manifest_path: manifestPath.value.trim() || directory.value.trim().replace(/[\\/]+$/, '') + '\\upload.yaml',
-    }, health.deployment_id)
-    previewDeployment = health.deployment_id
+    }, deployment)
+    previewDeployment = deployment
   } catch (failure) { formError.value = message(failure) }
   finally { busy.value = false }
 }

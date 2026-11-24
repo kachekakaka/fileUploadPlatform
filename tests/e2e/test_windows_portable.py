@@ -43,7 +43,9 @@ def portable_case(tmp_path, monkeypatch):
     platform = Portable.for_user(bundle)
     yield platform
     if platform.settings() and platform.settings()["deployment_id"]:
-        platform.stop(lambda role: None)
+        settings = platform.settings()
+        data = platform.data_directory(settings["data"])
+        platform.stop(lambda role: None, binding=(data, settings["deployment_id"]))
 
 
 def test_double_click_setup_reuses_deployment_and_drains(portable_case, work_factory, tmp_path):
@@ -220,7 +222,7 @@ def test_startup_faults_preserve_data_and_port_owner(portable_case):
     assert platform.health(deployment) is None
     worker_log.rmdir()
     assert start()[0] == build
-    platform.stop(lambda role: None)
+    platform.stop(lambda role: None, binding=(platform.default_data, deployment))
     database.rename(database.with_suffix(".saved"))
     with pytest.raises(Problem, match="原数据库丢失"):
         start()

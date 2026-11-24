@@ -14,6 +14,8 @@ Windows x64 ZIP 包含后端、Python 和已构建的 Dashboard。解压后使�
 
 构建候选包时，在同一脚本另传 `-EngineDirectory`、`-EngineNoticesDirectory`、`-EngineBuildId`、`-EngineSourceRevision` 和 `-MuMuSourceRevision`。两个源码版本参数传完整提交号。候选 ZIP 的命名带便携版本后缀。[便携验包入口](../../tests/README.md#mumu-便携版验收)
 
+MuMu 整合启动时传入 `--data-dir` 的绝对路径，工作区已绑定时再传 `--expected-deployment`。上传启动器只读核验已有 Core 库，启动窗口只可退出本窗口成功核验过的目录和部署。内嵌账号、作品和任务页面沿用 MuMu 提供的部署编号，获取会话或页面刷新后仍核对该编号。部署冲突时接口返回 `409 binding`。
+
 ## 从源码构建与启动
 
 使用 PowerShell 7，在仓库根目录执行。Python 环境见 [Core 安装说明](core-mvp.md#安装与启动)。前端构建验证使用 Node.js 24.18.0。

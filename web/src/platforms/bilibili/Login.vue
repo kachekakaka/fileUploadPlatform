@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import { get, manage } from '../../api/client'
+import { boundResource, get, manage } from '../../api/client'
 import type { Login, Page } from '../../api/types'
 import { notify } from '../../embed/protocol'
 import { date, message, shortId } from '../../shared/display'
@@ -87,7 +87,7 @@ onUnmounted(() => { stopped = true; clearTimeout(pollTimer) })
       <p><strong>{{ phases[login.outcome ?? login.phase] ?? login.phase }}</strong>
         <span class="muted"> · {{ shortId(login.session_id) }}</span></p>
       <template v-if="login.challenge">
-        <img class="qr" :src="login.challenge.image_path" alt="Bilibili 扫码登录二维码" />
+        <img class="qr" :src="boundResource(login.challenge.image_path)" alt="Bilibili 扫码登录二维码" />
         <p class="muted">本机确认时限 {{ date(Date.parse(login.challenge.deadline_at) / 1000) }}</p>
       </template>
       <p v-if="login.error" class="notice error" role="alert">{{ login.error.message }}</p>

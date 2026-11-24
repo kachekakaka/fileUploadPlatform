@@ -7,7 +7,7 @@ from queue import Empty, SimpleQueue
 from threading import Thread
 
 from upload_platform.domain.core import Problem
-from upload_platform.portable import ADDRESS, Portable
+from upload_platform.portable import ADDRESS, Portable, is_deployment_id
 
 TITLE = "文件上传平台 · MuMu 便携版"
 START = 103
@@ -15,7 +15,7 @@ STOP = 104
 DASHBOARD = 105
 
 
-def show_window(platform):
+def show_window(platform, data_dir=None, expected_deployment=None):
     import win32api
     import win32con as c
     import win32gui as gui
@@ -24,6 +24,7 @@ def show_window(platform):
     controls = {}
     status = []
     active = False
+    binding = None
     hdr = win32api.GetModuleHandle(None)
     signal = c.WM_APP + 1
 
@@ -70,21 +71,24 @@ def show_window(platform):
 
     def do_start():
         nonlocal active
-        settings = platform.settings()
-        data = Path(settings["data"]) if settings else platform.default_data
+        settings = platform.settings() if data_dir is None else None
+        data = data_dir or (Path(settings["data"]) if settings else platform.default_data)
         active = True
         input_state()
         gui.EnableWindow(controls[DASHBOARD], False)
         notice(f"正在检查设置及后台状态。\n日志位置 {data / 'logs'}")
 
         def apply():
-            result = platform.start(lambda *values: publish("status", values))
+            result = platform.start(
+                lambda *values: publish("status", values), data_dir=data_dir,
+                expected_deployment=expected_deployment,
+            )
             publish("ready", result)
 
         Thread(target=job, args=(apply,)).start()
 
     def event_handler(_hwnd, message, wparam, _lparam):
-        nonlocal active
+        nonlocal active, binding
         if message == c.WM_DESTROY:
             gui.PostQuitMessage(0)
             return 0
@@ -93,13 +97,13 @@ def show_window(platform):
             try:
                 if command == START:
                     do_start()
-                if command == STOP and platform.settings() is not None:
+                if command == STOP:
                     active = True
                     input_state()
                     gui.EnableWindow(controls[DASHBOARD], False)
 
                     def stop():
-                        platform.stop(lambda role: publish("stopping", role))
+                        platform.stop(lambda role: publish("stopping", role), binding=binding)
                         publish("stopped", None)
 
                     Thread(target=job, args=(stop,)).start()
@@ -126,7 +130,7 @@ def show_window(platform):
                     active = False
                     input_state()
                     if kind == "ready":
-                        build_id, available_accounts, logs = value
+                        build_id, available_accounts, logs, binding = value
                         for handle, line in zip(
                             status,
                             ("API 已就绪", "Worker 心跳正常", f"B 站引擎已就绪 · {build_id}"),
@@ -196,9 +200,15 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--bundle", required=True, type=Path)
+    parser.add_argument("--data-dir", type=Path)
+    parser.add_argument("--expected-deployment")
     args = parser.parse_args()
     try:
-        show_window(Portable.for_user(args.bundle))
+        if args.expected_deployment is not None and (
+            args.data_dir is None or not is_deployment_id(args.expected_deployment)
+        ):
+            raise Problem("portable_settings", "预期部署编号不正确，或未指定上传数据目录")
+        show_window(Portable.for_user(args.bundle), args.data_dir, args.expected_deployment)
     except Problem as exc:
         win32gui.MessageBox(0, exc.message, TITLE, win32con.MB_ICONERROR)
     except (OSError, ValueError, KeyError) as exc:

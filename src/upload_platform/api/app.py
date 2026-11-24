@@ -132,6 +132,18 @@ def create_app(config=None, database=None, service=None):
             and path.startswith("/api/v1/")
             and (browser or path == web.DASHBOARD_SESSION)
         )
+        deployment_id = app.state.deployment_id if path.startswith(web.PREFIX + "/") else None
+        expected = headers.getlist(web.DEPLOYMENT_HEADER)
+        resource = path.endswith("/events/stream") or path.endswith("/qr")
+        if resource and request.method == "GET":
+            expected += request.query_params.getlist("deployment")
+        embedded = headers.get("referer", "").startswith(dashboard.origin + "/embed/")
+        if deployment_id and (expected or embedded) and expected != [deployment_id]:
+            message = "上传平台部署已切换，请核对原单" if expected else "此 MuMu 工作区尚未绑定上传平台"
+            conflict = error(request, Problem("binding", message, 409))
+            conflict.headers[web.DEPLOYMENT_HEADER] = deployment_id
+            conflict.headers["Cache-Control"] = "no-store"
+            return web.cors(conflict) if public else conflict
         request.state.dashboard = dashboard_api
         if dashboard_api:
             try:
@@ -140,13 +152,6 @@ def create_app(config=None, database=None, service=None):
                 dashboard.authorize(request)
             except Problem as exc:
                 return error(request, exc)
-        deployment_id = app.state.deployment_id if path.startswith(web.PREFIX + "/") else None
-        expected = headers.getlist(web.DEPLOYMENT_HEADER)
-        if deployment_id and expected and expected != [deployment_id]:
-            conflict = error(request, Problem("binding", "上传平台部署已切换，请核对原单", 409))
-            conflict.headers[web.DEPLOYMENT_HEADER] = deployment_id
-            conflict.headers["Cache-Control"] = "no-store"
-            return web.cors(conflict) if public else conflict
         if request.method in web.WRITES:
             if not (public or dashboard_api or (gui and gui_route)) and (
                 headers.get("x-upload-platform-client") != "cli-v1"

@@ -5,4 +5,4 @@ if not exist "%~dp0runtime\pythonw.exe" (
     pause
     exit /b 1
 )
-start "" "%~dp0runtime\pythonw.exe" -B -X utf8 -m upload_platform.portable_window --bundle "%~dp0."
+start "" "%~dp0runtime\pythonw.exe" -B -X utf8 -m upload_platform.portable_window --bundle "%~dp0." %*

@@ -336,6 +336,25 @@ def test_deployment_header_blocks_wrong_database_before_admission(setup):
     assert counts(database) == [1, 1, 1]
 
 
+def test_embedded_requests_keep_the_original_deployment(setup):
+    client, database, _, _, _, _, _ = setup
+    original = uid()
+    browser = {"Sec-Fetch-Site": "same-origin", "Referer": ORIGIN + "/embed/accounts"}
+    header = "X-Upload-Platform-Deployment"
+    for path in ("/accounts?view=summary", "/works", "/tasks", "/dashboard/session"):
+        for binding in ({}, {header: original}):
+            reply = client.get("/api/v1" + path, headers={**browser, **binding})
+            assert (reply.status_code, reply.json()["code"]) == (409, "binding")
+    for path in (PREVIEW, SUBMIT, "/api/v1/accounts/" + uid()):
+        reply = client.request("PATCH" if "/accounts/" in path else "POST", path,
+                               headers={**browser, header: original, "Origin": ORIGIN}, json={})
+        assert (reply.status_code, reply.json()["code"]) == (409, "binding")
+    for segment in ("tasks/" + uid() + "/events/stream", "account-login-sessions/" + uid() + "/qr"):
+        reply = client.get("/api/v1/" + segment, headers=browser, params={"deployment": original})
+        assert (reply.status_code, reply.json()["code"]) == (409, "binding")
+    assert counts(database) == [0, 0, 0]
+
+
 def test_picker_validates_selected_directory_before_returning(tmp_path, config, monkeypatch):
     allowed, outside = tmp_path / "allowed", tmp_path / "outside"
     allowed.mkdir()

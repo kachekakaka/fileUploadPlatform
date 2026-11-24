@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { bindingError } from '../api/client'
 const route = useRoute()
 const embedded = computed(() => route.path.startsWith('/embed/'))
 const navigation = [
@@ -22,7 +23,8 @@ const active = (path: string) => route.path === path || route.path.startsWith(pa
       </nav>
     </aside>
     <main class="content">
-      <RouterView v-slot="{ Component }"><component :is="Component" :key="route.path" /></RouterView>
+      <p v-if="embedded && bindingError" class="notice error" role="alert">{{ bindingError }}</p>
+      <RouterView v-else v-slot="{ Component }"><component :is="Component" :key="route.path" /></RouterView>
     </main>
   </div>
 </template>
